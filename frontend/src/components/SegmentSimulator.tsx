@@ -101,12 +101,15 @@ export function SegmentSimulator({
 
     const maxLen = Math.max(...activeSegments.map((s) => s.len), 1);
     const buffers = activeSegments.map((spec) => new WledSegmentBuffer(spec.len));
+    // 3x3 sub-pixel cell per LED: 2px lit diode core + 1px dark housing gap
+    const cellW = 3;
+    const cellH = 3;
     const offscreens = activeSegments.map((spec) => {
       const oc = document.createElement("canvas");
-      oc.width = Math.max(1, spec.len);
-      oc.height = 1;
+      oc.width = Math.max(1, spec.len) * cellW;
+      oc.height = cellH;
       const octx = oc.getContext("2d");
-      const img = octx ? octx.createImageData(oc.width, 1) : null;
+      const img = octx ? octx.createImageData(oc.width, cellH) : null;
       return { oc, octx, img };
     });
 
@@ -167,20 +170,21 @@ export function SegmentSimulator({
         const padX = 4;
         const usableWidth = width - padX * 2;
         const barWidth = Math.max(1, (spec.len / maxLen) * usableWidth);
-        const ledHeight = compact ? 6 : 10;
+        const ledHeight = compact ? 8 : 12;
         const yTop = idx * rowHeight + (rowHeight - ledHeight) / 2;
 
-        ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
+        ctx.fillStyle = "rgba(9, 13, 22, 0.95)";
         ctx.fillRect(padX, yTop - 1, barWidth, ledHeight + 2);
 
         const { oc, octx, img } = offscreens[idx];
         if (octx && img) {
           const data = img.data;
+          const rowStride = oc.width * 4;
           const scale = globalBri * segBri;
           for (let d = 0; d < ledCount; d++) {
-            let r = 12;
-            let g = 16;
-            let b = 24;
+            let r = 14;
+            let g = 18;
+            let b = 28;
 
             if (liveBytes && liveLedCount > 0) {
               const globalLed = spec.start + d;
@@ -200,11 +204,50 @@ export function SegmentSimulator({
               }
             }
 
-            const p = d * 4;
-            data[p] = r;
-            data[p + 1] = g;
-            data[p + 2] = b;
-            data[p + 3] = 255;
+            // Soften unlit/dim pixels to dark diode housing
+            const coreR = Math.max(14, r);
+            const coreG = Math.max(18, g);
+            const coreB = Math.max(28, b);
+            const edgeR = Math.max(10, (coreR * 0.55) | 0);
+            const edgeG = Math.max(13, (coreG * 0.55) | 0);
+            const edgeB = Math.max(20, (coreB * 0.55) | 0);
+            const baseX = d * cellW * 4;
+
+            // Row 0 & Row 2: top/bottom diode bezel + dark gap at col 2
+            for (const row of [0, 2]) {
+              const rowOff = row * rowStride + baseX;
+              data[rowOff] = edgeR;
+              data[rowOff + 1] = edgeG;
+              data[rowOff + 2] = edgeB;
+              data[rowOff + 3] = 255;
+
+              data[rowOff + 4] = edgeR;
+              data[rowOff + 5] = edgeG;
+              data[rowOff + 6] = edgeB;
+              data[rowOff + 7] = 255;
+
+              data[rowOff + 8] = 8;
+              data[rowOff + 9] = 11;
+              data[rowOff + 10] = 18;
+              data[rowOff + 11] = 255;
+            }
+
+            // Row 1: bright diode core at cols 0-1 + dark gap at col 2
+            const midOff = rowStride + baseX;
+            data[midOff] = coreR;
+            data[midOff + 1] = coreG;
+            data[midOff + 2] = coreB;
+            data[midOff + 3] = 255;
+
+            data[midOff + 4] = coreR;
+            data[midOff + 5] = coreG;
+            data[midOff + 6] = coreB;
+            data[midOff + 7] = 255;
+
+            data[midOff + 8] = 8;
+            data[midOff + 9] = 11;
+            data[midOff + 10] = 18;
+            data[midOff + 11] = 255;
           }
           octx.putImageData(img, 0, 0);
           ctx.drawImage(oc, padX, yTop, barWidth, ledHeight);
@@ -255,8 +298,8 @@ export function SegmentSimulator({
 
       <canvas
         ref={canvasRef}
-        width={Math.max(720, Math.max(...activeSegments.map((s) => s.len), 1) + 8)}
-        height={activeSegments.length * (compact ? 22 : 28)}
+        width={Math.max(1440, Math.max(...activeSegments.map((s) => s.len), 1) * 3 + 8)}
+        height={activeSegments.length * (compact ? 24 : 32)}
         className="w-full rounded-lg bg-slate-950"
       />
 
