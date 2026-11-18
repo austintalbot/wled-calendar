@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Cpu, RefreshCw, Save, ScrollText } from "lucide-react";
-import { api, ControllerProfile, EffectRecord, ExecutionLog } from "../api";
+import { api, ControllerProfile, EffectRecord, ExecutionLog, ScheduleRuleRecord } from "../api";
 import { SegmentSimulator } from "../components/SegmentSimulator";
 
 interface Props {
@@ -16,8 +16,9 @@ export function SettingsPage({ profile, liveState, effects, onRefreshController 
   const [lon, setLon] = useState(profile?.longitude ?? -112.03);
   const [tz, setTz] = useState(profile?.timezone || "America/Boise");
   const [defaultEffectId, setDefaultEffectId] = useState<number>(effects[0]?.id || 0);
-  const [defaultTrigger, setDefaultTrigger] = useState<"sunset" | "fixed_time">("sunset");
+  const [defaultTrigger, setDefaultTrigger] = useState<"sunset" | "sunrise" | "fixed_time">("sunset");
   const [defaultTime, setDefaultTime] = useState("18:00");
+  const [currentDefault, setCurrentDefault] = useState<ScheduleRuleRecord | null>(null);
   const [logs, setLogs] = useState<ExecutionLog[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -38,12 +39,28 @@ export function SettingsPage({ profile, liveState, effects, onRefreshController 
 
   useEffect(() => {
     api.listLogs().then((r) => setLogs(r.logs)).catch(console.error);
+    api
+      .listRules()
+      .then((r) => {
+        const def = r.rules.find((rule) => rule.rule_type === "default") || null;
+        setCurrentDefault(def);
+        if (def) {
+          setDefaultEffectId(def.effect_id);
+          setDefaultTrigger(def.trigger_type);
+          if (def.trigger_time) setDefaultTime(def.trigger_time);
+        }
+      })
+      .catch(console.error);
   }, []);
 
   const handleSaveSettings = async () => {
-    await api.updateControllerSettings({ host, latitude: lat, longitude: lon, timezone: tz });
-    setMsg("Saved controller & location settings.");
-    onRefreshController();
+    try {
+      await api.updateControllerSettings({ host, latitude: lat, longitude: lon, timezone: tz });
+      setMsg("Saved controller & location settings.");
+      onRefreshController();
+    } catch (e: any) {
+      setMsg(`Failed to save settings: ${e.message}`);
+    }
   };
 
   const handleSync = async () => {
@@ -58,13 +75,18 @@ export function SettingsPage({ profile, liveState, effects, onRefreshController 
 
   const handleSetDefaultRule = async () => {
     if (!defaultEffectId) return;
-    await api.createRule({
-      rule_type: "default",
-      effect_id: defaultEffectId,
-      trigger_type: defaultTrigger,
-      trigger_time: defaultTrigger === "fixed_time" ? defaultTime : null,
-    });
-    setMsg("Updated daily fallback rule!");
+    try {
+      const res = await api.createRule({
+        rule_type: "default",
+        effect_id: defaultEffectId,
+        trigger_type: defaultTrigger,
+        trigger_time: defaultTrigger === "fixed_time" ? defaultTime : null,
+      });
+      setCurrentDefault(res.rule);
+      setMsg("Updated daily fallback rule!");
+    } catch (e: any) {
+      setMsg(`Failed to update daily fallback rule: ${e.message}`);
+    }
   };
 
   return (
@@ -137,7 +159,7 @@ export function SettingsPage({ profile, liveState, effects, onRefreshController 
                   paletteColors={profile.palette_colors}
                   compact
                   defaultLive
-                  label="Live Controller Output (192.168.68.200)"
+                  label={`Live Controller Output (${profile.host})`}
                 />
               )}
             </div>
@@ -150,6 +172,12 @@ export function SettingsPage({ profile, liveState, effects, onRefreshController 
             <p className="text-xs text-slate-400">
               Runs every day unless overridden by a specific date, holiday, or Google Calendar event.
             </p>
+            {currentDefault && (
+              <div className="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-xs text-slate-300">
+                Current default: <strong className="text-sky-300">{currentDefault.effect_name}</strong> ({currentDefault.trigger_type}
+                {currentDefault.trigger_time ? ` @ ${currentDefault.trigger_time}` : ""})
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <select
                 value={defaultEffectId}
@@ -169,6 +197,7 @@ export function SettingsPage({ profile, liveState, effects, onRefreshController 
                   className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-sm"
                 >
                   <option value="sunset">At Sunset</option>
+                  <option value="sunrise">At Sunrise</option>
                   <option value="fixed_time">Fixed Time</option>
                 </select>
                 {defaultTrigger === "fixed_time" && (

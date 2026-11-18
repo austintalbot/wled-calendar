@@ -41,9 +41,10 @@ def get_db_path() -> Path:
 
 @contextmanager
 def get_conn() -> Iterator[sqlite3.Connection]:
-    """Yield a SQLite connection with row_factory and foreign keys enabled."""
-    conn = sqlite3.connect(get_db_path(), check_same_thread=False)
+    """Yield a SQLite connection with row_factory, WAL busy_timeout, and foreign keys enabled."""
+    conn = sqlite3.connect(get_db_path(), timeout=15.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 5000;")
     conn.execute("PRAGMA foreign_keys = ON;")
     try:
         yield conn
@@ -58,6 +59,7 @@ def get_conn() -> Iterator[sqlite3.Connection]:
 def init_db() -> None:
     """Create tables if they do not exist and seed default controller profile."""
     with get_conn() as conn:
+        conn.execute("PRAGMA journal_mode = WAL;")
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS controller_profile (

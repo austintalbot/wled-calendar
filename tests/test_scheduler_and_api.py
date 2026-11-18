@@ -91,3 +91,18 @@ def test_schedule_priority_and_api_flow() -> None:
         dec24 = resolve_day_schedule(date(2026, 12, 24))
         assert dec24.effect_id == xmas_id
         assert "google_all_day" in (dec24.source or "")
+
+        # 6. Deduplication on curated import & upsert on default/date rules
+        dup_res = client.post("/api/effects/import/curated", json={"slugs": ["warm-sunset"]})
+        assert dup_res.status_code == 200
+        assert len(dup_res.json()["imported"]) == 0
+        assert dup_res.json()["skipped"] == 1
+
+        # Upsert default rule instead of creating duplicate
+        res = client.post(
+            "/api/schedule/rules",
+            json={"rule_type": "default", "effect_id": xmas_id, "trigger_type": "fixed_time", "trigger_time": "19:00"},
+        )
+        assert res.status_code == 200
+        rules_res = client.get("/api/schedule/rules").json()["rules"]
+        assert sum(1 for r in rules_res if r["rule_type"] == "default") == 1

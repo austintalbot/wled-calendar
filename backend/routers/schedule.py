@@ -45,36 +45,79 @@ def list_rules() -> dict[str, Any]:
 
 @router.post("/rules")
 def create_rule(body: ScheduleRuleCreate) -> dict[str, Any]:
-    """Create a schedule rule and refresh today's scheduled jobs."""
+    """Create a schedule rule (upserting existing default or same-date rules) and refresh today's jobs."""
     priority = body.priority if body.priority is not None else RULE_DEFAULT_PRIORITIES[body.rule_type]
     with get_conn() as conn:
         eff = conn.execute("SELECT id FROM effects WHERE id = ?", (body.effect_id,)).fetchone()
         if not eff:
             raise HTTPException(status_code=404, detail="Target effect not found")
-        cur = conn.execute(
-            """
-            INSERT INTO schedule_rules (
-                rule_type, start_date, end_date, days_of_week_json, holiday_name,
-                effect_id, trigger_type, trigger_time, offset_minutes,
-                brightness_override, priority, enabled, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                body.rule_type,
-                body.start_date,
-                body.end_date,
-                json.dumps(body.days_of_week),
-                body.holiday_name,
-                body.effect_id,
-                body.trigger_type,
-                body.trigger_time,
-                body.offset_minutes,
-                body.brightness_override,
-                priority,
-                1 if body.enabled else 0,
-                utc_now_iso(),
-            ),
-        )
+
+        existing_id: int | None = None
+        if body.rule_type == "default":
+            row = conn.execute("SELECT id FROM schedule_rules WHERE rule_type = 'default' ORDER BY id DESC LIMIT 1").fetchone()
+            if row:
+                existing_id = row["id"]
+        elif body.rule_type == "date" and body.start_date:
+            row = conn.execute(
+                "SELECT id FROM schedule_rules WHERE rule_type = 'date' AND start_date = ? ORDER BY id DESC LIMIT 1",
+                (body.start_date,),
+            ).fetchone()
+            if row:
+                existing_id = row["id"]
+
+        if existing_id is not None:
+            conn.execute(
+                """
+                UPDATE schedule_rules
+                SET rule_type = ?, start_date = ?, end_date = ?, days_of_week_json = ?,
+                    holiday_name = ?, effect_id = ?, trigger_type = ?, trigger_time = ?,
+                    offset_minutes = ?, brightness_override = ?, priority = ?, enabled = ?
+                WHERE id = ?
+                """,
+                (
+                    body.rule_type,
+                    body.start_date,
+                    body.end_date,
+                    json.dumps(body.days_of_week),
+                    body.holiday_name,
+                    body.effect_id,
+                    body.trigger_type,
+                    body.trigger_time,
+                    body.offset_minutes,
+                    body.brightness_override,
+                    priority,
+                    1 if body.enabled else 0,
+                    existing_id,
+                ),
+            )
+            target_id = existing_id
+        else:
+            cur = conn.execute(
+                """
+                INSERT INTO schedule_rules (
+                    rule_type, start_date, end_date, days_of_week_json, holiday_name,
+                    effect_id, trigger_type, trigger_time, offset_minutes,
+                    brightness_override, priority, enabled, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    body.rule_type,
+                    body.start_date,
+                    body.end_date,
+                    json.dumps(body.days_of_week),
+                    body.holiday_name,
+                    body.effect_id,
+                    body.trigger_type,
+                    body.trigger_time,
+                    body.offset_minutes,
+                    body.brightness_override,
+                    priority,
+                    1 if body.enabled else 0,
+                    utc_now_iso(),
+                ),
+            )
+            target_id = cur.lastrowid
+
         row = conn.execute(
             """
             SELECT r.*, e.name AS effect_name
@@ -82,7 +125,7 @@ def create_rule(body: ScheduleRuleCreate) -> dict[str, Any]:
             JOIN effects e ON e.id = r.effect_id
             WHERE r.id = ?
             """,
-            (cur.lastrowid,),
+            (target_id,),
         ).fetchone()
     refresh_daily_jobs()
     return {"rule": row_to_rule(row)}

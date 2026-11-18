@@ -117,6 +117,14 @@ export function WledEffectEditorModal({ effect, isNew = false, profile, onClose,
     activePalRef.current?.scrollIntoView({ block: "center" });
   }, [activeSegIdx, draft.segment_mode]);
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   const segs: Record<string, any>[] = Array.isArray(draft.payload?.seg) && draft.payload.seg.length > 0
     ? draft.payload.seg
     : [{ fx: 0, pal: 0, sx: 128, ix: 128, c1: 128, c2: 128, c3: 16, col: [[255, 160, 0], [0, 0, 0], [0, 0, 0]] }];
@@ -151,11 +159,7 @@ export function WledEffectEditorModal({ effect, isNew = false, profile, onClose,
   const handleLiveTest = async () => {
     setBusy(true);
     try {
-      await fetch("/api/controller/apply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payload: draft.payload }),
-      });
+      await api.applyPayloadNow(draft.payload, draft.segment_mode);
       setToast("Sent live preview to WLED controller!");
     } catch (e: any) {
       setToast(`Error: ${e.message}`);
@@ -184,6 +188,8 @@ export function WledEffectEditorModal({ effect, isNew = false, profile, onClose,
             tags: draft.tags,
           });
       onSaved(res.effect);
+    } catch (e: any) {
+      setToast(`Error: ${e.message}`);
     } finally {
       setBusy(false);
     }
@@ -208,8 +214,17 @@ export function WledEffectEditorModal({ effect, isNew = false, profile, onClose,
   const globalOn = draft.payload?.on !== false;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 sm:p-5">
-      <div className="w-full max-w-6xl rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4 max-h-[94vh] overflow-y-auto">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="WLED Effect Editor"
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 sm:p-5"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-6xl rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4 max-h-[94vh] overflow-y-auto"
+      >
         {/* Top Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
           <div className="flex items-center gap-3 flex-1 min-w-[220px]">

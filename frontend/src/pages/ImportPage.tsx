@@ -22,7 +22,7 @@ export function ImportPage({ onImported }: Props) {
   // JSON import state
   const [jsonName, setJsonName] = useState("My Imported Preset");
   const [rawJson, setRawJson] = useState("");
-  const [jsonSegMode, setJsonSegMode] = useState<"mirror" | "custom">("mirror");
+  const [jsonSegMode, setJsonSegMode] = useState<"mirror" | "custom" | "normalized">("mirror");
   // Controller presets state
   const [ctrlPresets, setCtrlPresets] = useState<any[]>([]);
   // Feeds state
@@ -40,7 +40,8 @@ export function ImportPage({ onImported }: Props) {
     setBusy(true);
     try {
       const res = await api.importCurated(slugs);
-      setMessage(`Imported ${res.imported.length} curated preset(s) into your library.`);
+      const skippedNote = res.skipped ? ` (${res.skipped} already in library)` : "";
+      setMessage(`Imported ${res.imported.length} curated preset(s) into your library.${skippedNote}`);
       onImported();
     } catch (e: any) {
       setMessage(`Error: ${e.message}`);
@@ -70,7 +71,8 @@ export function ImportPage({ onImported }: Props) {
     setBusy(true);
     try {
       const res = await api.commitUrlImport(urlInput, selectedKeys);
-      setMessage(`Imported ${res.imported.length} preset(s) from URL.`);
+      const skippedNote = res.skipped ? ` (${res.skipped} already in library)` : "";
+      setMessage(`Imported ${res.imported.length} preset(s) from URL.${skippedNote}`);
       setUrlPresets([]);
       onImported();
     } catch (e: any) {
@@ -121,6 +123,8 @@ export function ImportPage({ onImported }: Props) {
       });
       setMessage(`Imported "${preset.name}" from controller.`);
       onImported();
+    } catch (e: any) {
+      setMessage(`Error: ${e.message}`);
     } finally {
       setBusy(false);
     }
@@ -199,7 +203,7 @@ export function ImportPage({ onImported }: Props) {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-400">
-              Pre-configured seasonal, holiday, and everyday effects adapted to your 1078-LED 3-segment controller.
+              Pre-configured seasonal, holiday, and everyday effects adapted to your WLED controller segments.
             </p>
             <button
               disabled={busy}
@@ -241,7 +245,7 @@ export function ImportPage({ onImported }: Props) {
           <div>
             <h3 className="font-semibold">Import from Internet URL</h3>
             <p className="text-xs text-slate-400 mt-1">
-              Supports raw WLED JSON URLs, GitHub file URLs, GitHub Gists, and Pastebin links. Automatically maps to your 3 segments.
+              Supports raw WLED JSON URLs, GitHub file URLs, GitHub Gists, and Pastebin links. Automatically maps to your controller segments.
             </p>
           </div>
           <div className="flex gap-2">
@@ -311,7 +315,8 @@ export function ImportPage({ onImported }: Props) {
               onChange={(e) => setJsonSegMode(e.target.value as any)}
               className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
             >
-              <option value="mirror">Mirror across all 3 segments</option>
+              <option value="mirror">Mirror across all segments</option>
+              <option value="normalized">Sync speed / density across strands</option>
               <option value="custom">Preserve segment definitions</option>
             </select>
           </div>
@@ -359,11 +364,22 @@ export function ImportPage({ onImported }: Props) {
                   <button
                     disabled={busy}
                     onClick={async () => {
-                      await api.deleteControllerPreset(Number(p.key));
-                      setCtrlPresets((prev) => prev.filter((x) => x.key !== p.key));
-                      setMessage(`Deleted preset slot #${p.key} from WLED controller.`);
+                      if (!window.confirm(`Permanently delete preset #${p.key} ("${p.name}") from your WLED controller?`)) {
+                        return;
+                      }
+                      setBusy(true);
+                      try {
+                        await api.deleteControllerPreset(Number(p.key));
+                        setCtrlPresets((prev) => prev.filter((x) => x.key !== p.key));
+                        setMessage(`Deleted preset slot #${p.key} from WLED controller.`);
+                      } catch (e: any) {
+                        setMessage(`Error: ${e.message}`);
+                      } finally {
+                        setBusy(false);
+                      }
                     }}
                     className="rounded-lg bg-slate-800 p-1.5 text-rose-400 hover:bg-slate-700"
+                    aria-label={`Delete preset slot ${p.key} from WLED controller`}
                     title="Delete from WLED controller"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -434,10 +450,16 @@ export function ImportPage({ onImported }: Props) {
                   </button>
                   <button
                     onClick={async () => {
-                      await api.deleteFeed(f.id);
-                      setFeeds((prev) => prev.filter((x) => x.id !== f.id));
+                      if (!window.confirm(`Remove calendar feed "${f.name}"?`)) return;
+                      try {
+                        await api.deleteFeed(f.id);
+                        setFeeds((prev) => prev.filter((x) => x.id !== f.id));
+                      } catch (e: any) {
+                        setMessage(`Error: ${e.message}`);
+                      }
                     }}
                     className="rounded-lg bg-slate-800 p-2 text-rose-400 hover:bg-slate-700"
+                    aria-label={`Remove feed ${f.name}`}
                     title="Remove feed"
                   >
                     <Trash2 className="h-4 w-4" />

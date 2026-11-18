@@ -88,12 +88,15 @@ def _normalize_segment(
     profile: ControllerProfile,
 ) -> dict[str, Any]:
     """Build a controller-compatible segment dict for a specific hardware SegmentSpec."""
+    seg_on = seg.get("on", True)
+    raw_bri = int(seg.get("bri", 255))
+    clamped_bri = max(0 if (seg_on is False or raw_bri == 0) else 1, min(255, raw_bri))
     normalized: dict[str, Any] = {
         "id": spec.id,
         "start": spec.start,
         "stop": spec.stop,
-        "on": seg.get("on", True),
-        "bri": max(1, min(255, int(seg.get("bri", 255)))),
+        "on": seg_on,
+        "bri": clamped_bri,
         "fx": _resolve_index(seg.get("fx", 0), profile.effects, profile.fx_count),
         "sx": max(0, min(255, int(seg.get("sx", 128)))),
         "ix": max(0, min(255, int(seg.get("ix", 128)))),
@@ -144,6 +147,10 @@ def adapt_payload_to_controller(
         ),
         "transition": max(0, min(255, int(state.get("transition", 7)))),
     }
+
+    if isinstance(state.get("playlist"), dict):
+        adapted["playlist"] = state["playlist"]
+        return adapted
 
     raw_segs = state.get("seg")
     if isinstance(raw_segs, dict):
@@ -219,6 +226,14 @@ async def sync_controller_profile(host: str | None = None) -> ControllerProfile:
         except Exception:
             pass
 
+        state_segs: list[dict[str, Any]] = []
+        try:
+            state_resp = await client.get(f"{base}/json/state")
+            if state_resp.status_code == 200 and isinstance(state_resp.json().get("seg"), list):
+                state_segs = state_resp.json()["seg"]
+        except Exception:
+            pass
+
     info = info_resp.json()
     cfg = cfg_resp.json()
     effects = eff_resp.json()
@@ -226,22 +241,42 @@ async def sync_controller_profile(host: str | None = None) -> ControllerProfile:
 
     led_ins = cfg.get("hw", {}).get("led", {}).get("ins", [])
     segments: list[SegmentSpec] = []
-    for idx, ins in enumerate(led_ins):
-        length = int(ins.get("len", 0))
-        if length <= 0:
-            continue
-        start = int(ins.get("start", 0))
-        pins = ins.get("pin") or []
-        segments.append(
-            SegmentSpec(
-                id=idx,
-                start=start,
-                stop=start + length,
-                len=length,
-                pin=int(pins[0]) if pins else None,
-                name=ins.get("text") or f"Segment {idx + 1}",
+    if len(state_segs) > 1:
+        for idx, s in enumerate(state_segs):
+            start = int(s.get("start", 0))
+            stop = int(s.get("stop", 0))
+            length = stop - start
+            if length <= 0:
+                continue
+            pins = led_ins[idx].get("pin") if idx < len(led_ins) else None
+            segments.append(
+                SegmentSpec(
+                    id=int(s.get("id", idx)),
+                    start=start,
+                    stop=stop,
+                    len=length,
+                    pin=int(pins[0]) if pins else None,
+                    name=s.get("n") or f"Segment {idx + 1}",
+                )
             )
-        )
+    if not segments:
+        for idx, ins in enumerate(led_ins):
+            length = int(ins.get("len", 0))
+            if length <= 0:
+                continue
+            start = int(ins.get("start", 0))
+            pins = ins.get("pin") or []
+            state_name = state_segs[idx].get("n") if idx < len(state_segs) and isinstance(state_segs[idx], dict) else None
+            segments.append(
+                SegmentSpec(
+                    id=idx,
+                    start=start,
+                    stop=start + length,
+                    len=length,
+                    pin=int(pins[0]) if pins else None,
+                    name=state_name or ins.get("text") or f"Segment {idx + 1}",
+                )
+            )
 
     ntp = cfg.get("if", {}).get("ntp", {})
     lat = float(ntp.get("lt", current.latitude) or current.latitude)

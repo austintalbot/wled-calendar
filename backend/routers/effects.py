@@ -16,6 +16,16 @@ from backend.wled_client import adapt_payload_to_controller, extract_preview_col
 router = APIRouter(prefix="/api/effects", tags=["effects"])
 
 
+def _find_existing_effect(name: str, source_type: str) -> dict[str, Any] | None:
+    """Return an existing effect matching name and source_type, if present."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM effects WHERE LOWER(name) = LOWER(?) AND source_type = ? LIMIT 1",
+            (name.strip(), source_type),
+        ).fetchone()
+    return row_to_effect(row) if row else None
+
+
 def _insert_effect(
     name: str,
     source_type: str,
@@ -132,8 +142,12 @@ async def import_from_url(body: UrlImportRequest) -> dict[str, Any]:
 
     selected = set(body.selected_keys or [])
     imported: list[dict[str, Any]] = []
+    skipped = 0
     for item in presets:
         if body.import_all or item["key"] in selected:
+            if _find_existing_effect(item["name"], "url"):
+                skipped += 1
+                continue
             imported.append(
                 _insert_effect(
                     name=item["name"],
@@ -145,7 +159,7 @@ async def import_from_url(body: UrlImportRequest) -> dict[str, Any]:
                     preview_colors=item["preview_colors"],
                 )
             )
-    return {"raw_url": raw_url, "presets": presets, "imported": imported}
+    return {"raw_url": raw_url, "presets": presets, "imported": imported, "skipped": skipped}
 
 
 @router.post("/import/json")
@@ -187,9 +201,13 @@ def import_curated(body: CuratedImportRequest) -> dict[str, Any]:
     profile = get_controller_profile()
     catalog = {item["slug"]: item for item in build_curated_presets(profile)}
     imported: list[dict[str, Any]] = []
+    skipped = 0
     for slug in body.slugs:
         item = catalog.get(slug)
         if not item:
+            continue
+        if _find_existing_effect(item["name"], "curated"):
+            skipped += 1
             continue
         imported.append(
             _insert_effect(
@@ -202,4 +220,4 @@ def import_curated(body: CuratedImportRequest) -> dict[str, Any]:
                 preview_colors=item["preview_colors"],
             )
         )
-    return {"imported": imported}
+    return {"imported": imported, "skipped": skipped}
