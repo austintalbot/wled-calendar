@@ -1,0 +1,32 @@
+services:
+  wled-calendar:
+    build: .
+    container_name: wled-calendar
+    restart: unless-stopped
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"
+    environment:
+      - WLED_HOST=${WLED_HOST:-192.168.68.200}
+      - TIMEZONE=${TIMEZONE:-America/Boise}
+      - DB_PATH=/app/data/wled_calendar.db
+    volumes:
+      - ./data:/app/data
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: wled-calendar-caddy
+    restart: unless-stopped
+    depends_on:
+      - wled-calendar
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      - SITE_ADDRESS=${SITE_ADDRESS:-wled-calendar.local, localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy_data:/data
+      - ./caddy_config:/config

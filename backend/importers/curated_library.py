@@ -1,0 +1,223 @@
+"""Curated library of seasonal, holiday, and everyday WLED presets."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from backend.models import ControllerProfile
+from backend.wled_client import adapt_payload_to_controller, extract_preview_colors
+
+CURATED_CATALOG: list[dict[str, Any]] = [
+    {
+        "slug": "warm-sunset",
+        "name": "Warm Sunset Glow",
+        "tags": ["everyday", "sunset", "warm"],
+        "description": "Gentle sunset gradient with soft ambient motion.",
+        "fx_name": "Breathe",
+        "pal_name": "Sunset",
+        "sx": 90,
+        "ix": 110,
+        "bri": 220,
+        "col": [[255, 110, 30], [255, 40, 80], [255, 190, 60]],
+    },
+    {
+        "slug": "aurora-borealis",
+        "name": "Aurora Borealis",
+        "tags": ["everyday", "night", "northern-lights"],
+        "description": "Flowing emerald and violet northern lights.",
+        "fx_name": "Aurora",
+        "pal_name": "Forest",
+        "sx": 115,
+        "ix": 140,
+        "bri": 230,
+        "col": [[0, 255, 140], [40, 120, 255], [160, 40, 255]],
+    },
+    {
+        "slug": "ocean-breeze",
+        "name": "Ocean Breeze",
+        "tags": ["everyday", "calm", "blue"],
+        "description": "Cool coastal waves in deep blue and aqua.",
+        "fx_name": "Lake",
+        "pal_name": "Ocean",
+        "sx": 100,
+        "ix": 128,
+        "bri": 210,
+        "col": [[0, 140, 255], [0, 230, 200], [10, 40, 120]],
+    },
+    {
+        "slug": "christmas-twinkle",
+        "name": "Christmas Classic Twinkle",
+        "tags": ["holiday", "christmas", "winter"],
+        "description": "Festive red, green, and warm white twinkling lights.",
+        "fx_name": "Twinklefox",
+        "pal_name": "Party",
+        "sx": 110,
+        "ix": 160,
+        "bri": 255,
+        "col": [[255, 15, 15], [10, 220, 35], [255, 220, 150]],
+    },
+    {
+        "slug": "candy-cane-chase",
+        "name": "Candy Cane Chase",
+        "tags": ["holiday", "christmas", "winter"],
+        "description": "Crisp red and white holiday chase.",
+        "fx_name": "Chase 2",
+        "pal_name": "* Colors 1&2",
+        "sx": 120,
+        "ix": 140,
+        "bri": 255,
+        "col": [[255, 0, 0], [255, 245, 235], [0, 0, 0]],
+    },
+    {
+        "slug": "halloween-spooky",
+        "name": "Halloween Spooky Flicker",
+        "tags": ["holiday", "halloween", "october"],
+        "description": "Eerie pumpkin orange and haunted purple shimmer.",
+        "fx_name": "Fire 2012",
+        "pal_name": "Orange & Teal",
+        "sx": 125,
+        "ix": 150,
+        "bri": 240,
+        "col": [[255, 80, 0], [130, 0, 255], [0, 220, 80]],
+    },
+    {
+        "slug": "fourth-of-july",
+        "name": "4th of July Fireworks",
+        "tags": ["holiday", "july4", "independence", "patriotic"],
+        "description": "Red, white, and blue starburst fireworks.",
+        "fx_name": "Fireworks",
+        "pal_name": "Red & Blue",
+        "sx": 140,
+        "ix": 175,
+        "bri": 255,
+        "col": [[255, 0, 0], [255, 255, 255], [0, 40, 255]],
+    },
+    {
+        "slug": "autumn-harvest",
+        "name": "Autumn Harvest",
+        "tags": ["holiday", "thanksgiving", "fall", "autumn"],
+        "description": "Warm amber, crimson, and golden fall leaves.",
+        "fx_name": "Colorwaves",
+        "pal_name": "Autumn",
+        "sx": 95,
+        "ix": 128,
+        "bri": 230,
+        "col": [[255, 95, 0], [200, 25, 0], [255, 190, 20]],
+    },
+    {
+        "slug": "valentines-pulse",
+        "name": "Valentine's Rose Pulse",
+        "tags": ["holiday", "valentine", "romantic"],
+        "description": "Soft crimson, rose, and magenta heartbeats.",
+        "fx_name": "Heartbeat",
+        "pal_name": "Magenta",
+        "sx": 110,
+        "ix": 130,
+        "bri": 225,
+        "col": [[255, 10, 70], [255, 110, 170], [180, 0, 60]],
+    },
+    {
+        "slug": "st-patricks-emerald",
+        "name": "St. Patrick's Emerald",
+        "tags": ["holiday", "stpatrick", "green"],
+        "description": "Sparkling shamrock green and gold.",
+        "fx_name": "Sparkle+",
+        "pal_name": "Forest",
+        "sx": 128,
+        "ix": 150,
+        "bri": 240,
+        "col": [[0, 230, 45], [255, 200, 0], [0, 120, 30]],
+    },
+    {
+        "slug": "rainbow-party",
+        "name": "Rainbow Party",
+        "tags": ["celebration", "birthday", "party"],
+        "description": "Vibrant full-spectrum celebration waves.",
+        "fx_name": "Rainbow",
+        "pal_name": "Rainbow",
+        "sx": 135,
+        "ix": 128,
+        "bri": 255,
+        "col": [[255, 0, 128], [0, 255, 255], [255, 230, 0]],
+    },
+    {
+        "slug": "new-years-sparkle",
+        "name": "New Year's Champagne Sparkle",
+        "tags": ["holiday", "newyear", "celebration"],
+        "description": "Shimmering champagne gold and crisp white.",
+        "fx_name": "Sparkle",
+        "pal_name": "Vintage",
+        "sx": 140,
+        "ix": 170,
+        "bri": 255,
+        "col": [[255, 215, 120], [255, 250, 230], [200, 150, 50]],
+    },
+    {
+        "slug": "easter-pastel",
+        "name": "Spring Pastel",
+        "tags": ["holiday", "easter", "spring"],
+        "description": "Soft lavender, mint, and baby blue spring shimmer.",
+        "fx_name": "Palette",
+        "pal_name": "Pastel",
+        "sx": 95,
+        "ix": 128,
+        "bri": 220,
+        "col": [[200, 160, 255], [140, 255, 210], [255, 190, 210]],
+    },
+    {
+        "slug": "warm-architectural",
+        "name": "Warm Architectural White",
+        "tags": ["everyday", "clean", "architectural"],
+        "description": "Clean 2700K warm white static accent lighting.",
+        "fx_name": "Solid",
+        "pal_name": "Default",
+        "sx": 128,
+        "ix": 128,
+        "bri": 210,
+        "col": [[255, 195, 120], [0, 0, 0], [0, 0, 0]],
+    },
+    {
+        "slug": "game-day-energy",
+        "name": "Game Day Stadium Chase",
+        "tags": ["sports", "game", "party"],
+        "description": "High-energy stadium runner in bold team colors.",
+        "fx_name": "Running",
+        "pal_name": "* Colors 1&2",
+        "sx": 165,
+        "ix": 160,
+        "bri": 255,
+        "col": [[0, 90, 255], [255, 130, 0], [255, 255, 255]],
+    },
+]
+
+
+def build_curated_presets(profile: ControllerProfile) -> list[dict[str, Any]]:
+    """Resolve curated presets into controller-compatible WLED payloads."""
+    items: list[dict[str, Any]] = []
+    for entry in CURATED_CATALOG:
+        raw_state = {
+            "on": True,
+            "bri": entry["bri"],
+            "transition": 7,
+            "seg": [
+                {
+                    "fx": entry["fx_name"],
+                    "pal": entry["pal_name"],
+                    "sx": entry["sx"],
+                    "ix": entry["ix"],
+                    "col": entry["col"],
+                }
+            ],
+        }
+        adapted = adapt_payload_to_controller(raw_state, profile, segment_mode="mirror")
+        items.append(
+            {
+                "slug": entry["slug"],
+                "name": entry["name"],
+                "description": entry["description"],
+                "tags": entry["tags"],
+                "payload": adapted,
+                "preview_colors": extract_preview_colors(adapted),
+            }
+        )
+    return items

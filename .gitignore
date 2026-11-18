@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+data/
+caddy_data/
+caddy_config/
+*.db
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Env / OS
+.env
+.DS_Store

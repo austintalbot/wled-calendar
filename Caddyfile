@@ -1,0 +1,4 @@
+{$SITE_ADDRESS:wled-calendar.local, localhost} {
+	tls internal
+	reverse_proxy wled-calendar:8000
+}
