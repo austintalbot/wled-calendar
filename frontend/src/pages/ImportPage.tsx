@@ -41,6 +41,7 @@ export function ImportPage({ profile, onImported }: Props) {
 
   // Curated state
   const [curated, setCurated] = useState<any[]>([]);
+  const [curatedFilter, setCuratedFilter] = useState<string>("all");
   // URL import state
   const [urlInput, setUrlInput] = useState("");
   const [urlPresets, setUrlPresets] = useState<any[]>([]);
@@ -277,22 +278,57 @@ export function ImportPage({ profile, onImported }: Props) {
           );
         })()}
 
-      {tab === "curated" && (
+      {tab === "curated" && (() => {
+        const filteredCurated =
+          curatedFilter === "all"
+            ? curated
+            : curated.filter((c) => Array.isArray(c.tags) && c.tags.includes(curatedFilter));
+        const curatedCategories = [
+          { key: "all", label: "All" },
+          { key: "gaming", label: "Gaming" },
+          { key: "bedroom", label: "Bedroom" },
+          { key: "romantic", label: "Romantic" },
+          { key: "christmas", label: "Christmas" },
+          { key: "diwali", label: "Diwali" },
+          { key: "halloween", label: "Halloween" },
+          { key: "party", label: "Party" },
+          { key: "fireplace", label: "Fireplace" },
+          { key: "rainbow", label: "Rainbow" },
+          { key: "ambient", label: "Ambient" },
+          { key: "nature", label: "Nature" },
+        ];
+        return (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-slate-400">
               Pre-configured seasonal, holiday, and everyday effects adapted to your WLED controller segments.
             </p>
             <button
-              disabled={busy}
-              onClick={() => handleImportCurated(curated.map((c) => c.slug))}
-              className="rounded-xl bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400"
+              disabled={busy || filteredCurated.length === 0}
+              onClick={() => handleImportCurated(filteredCurated.map((c) => c.slug))}
+              className="rounded-xl bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
             >
-              Import All ({curated.length})
+              {curatedFilter === "all" ? `Import All (${filteredCurated.length})` : `Import ${curatedFilter} (${filteredCurated.length})`}
             </button>
           </div>
+          <div className="flex flex-wrap gap-1.5">
+            {curatedCategories.map((cat) => (
+              <button
+                key={cat.key}
+                type="button"
+                onClick={() => setCuratedFilter(cat.key)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
+                  curatedFilter === cat.key
+                    ? "bg-sky-500 text-slate-950"
+                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {curated.map((item) => {
+            {filteredCurated.map((item) => {
               const grad =
                 item.preview_colors.length >= 2
                   ? `linear-gradient(90deg, ${item.preview_colors.join(", ")})`
@@ -332,7 +368,8 @@ export function ImportPage({ profile, onImported }: Props) {
             })}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {tab === "url" && (
         <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 space-y-4 max-w-3xl">
