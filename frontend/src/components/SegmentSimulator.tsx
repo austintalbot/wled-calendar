@@ -93,25 +93,59 @@ export function SegmentSimulator({
     };
   }, [useLive]);
 
+  const canvasWidth = 1600;
+  const padX = 10;
+  const ledPitch = compact ? 13 : 18;
+  const ledSize = compact ? 10 : 14;
+  const rowPitch = compact ? 15 : 21;
+  const segGap = compact ? 8 : 12;
+  const cols = Math.max(1, Math.floor((canvasWidth - padX * 2) / ledPitch));
+
+  const segmentLayout = useMemo(() => {
+    let y = 8;
+    return activeSegments.map((spec) => {
+      const rows = Math.max(1, Math.ceil(spec.len / cols));
+      const startY = y;
+      y += rows * rowPitch + segGap;
+      return { spec, rows, startY };
+    });
+  }, [activeSegments, cols, rowPitch, segGap]);
+
+  const canvasHeight = Math.max(
+    48,
+    (segmentLayout[segmentLayout.length - 1]?.startY ?? 8) +
+      (segmentLayout[segmentLayout.length - 1]?.rows ?? 1) * rowPitch +
+      6
+  );
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const maxLen = Math.max(...activeSegments.map((s) => s.len), 1);
     const buffers = activeSegments.map((spec) => new WledSegmentBuffer(spec.len));
-    // 4x3 sub-pixel cell per LED: 3px lit diode core + 1px dark housing gap
-    const cellW = 4;
-    const cellH = 3;
-    const offscreens = activeSegments.map((spec) => {
-      const oc = document.createElement("canvas");
-      oc.width = Math.max(1, spec.len) * cellW;
-      oc.height = cellH;
-      const octx = oc.getContext("2d");
-      const img = octx ? octx.createImageData(oc.width, cellH) : null;
-      return { oc, octx, img };
-    });
+    const img = ctx.createImageData(canvasWidth, canvasHeight);
+    const data = img.data;
+
+    // Precompute circular radial falloff mask (ledSize x ledSize)
+    const radius = ledSize / 2;
+    const center = (ledSize - 1) / 2;
+    const circleMask = new Float32Array(ledSize * ledSize);
+    for (let py = 0; py < ledSize; py++) {
+      for (let px = 0; px < ledSize; px++) {
+        const dx = px - center;
+        const dy = py - center;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist <= radius * 0.45) {
+          circleMask[py * ledSize + px] = 1.0;
+        } else if (dist <= radius) {
+          circleMask[py * ledSize + px] = Math.max(0.35, 1 - ((dist - radius * 0.45) / (radius * 0.55)) * 0.65);
+        } else {
+          circleMask[py * ledSize + px] = -1;
+        }
+      }
+    }
 
     let rafId = 0;
     const startMs = performance.now();
@@ -124,9 +158,6 @@ export function SegmentSimulator({
       }
 
       const timeSec = (nowMs - startMs) / 1000;
-      const width = canvas.width;
-      const height = canvas.height;
-      const rowHeight = height / activeSegments.length;
       const liveBytes = useLive ? liveFrameRef.current : null;
       const liveLedCount = liveBytes ? Math.floor(liveBytes.length / 3) : 0;
 
@@ -136,10 +167,14 @@ export function SegmentSimulator({
         lastTickMs = nowMs;
       }
 
-      ctx.clearRect(0, 0, width, height);
-      ctx.imageSmoothingEnabled = false;
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = 6;
+        data[i + 1] = 9;
+        data[i + 2] = 16;
+        data[i + 3] = 255;
+      }
 
-      activeSegments.forEach((spec, idx) => {
+      segmentLayout.forEach(({ spec, startY }, idx) => {
         const baseSeg =
           segmentMode === "custom" && rawSegs[idx] ? rawSegs[idx] : rawSegs[0] || {};
         const ratio = segmentMode === "normalized" && refLen > 0 ? spec.len / refLen : 1;
@@ -167,95 +202,60 @@ export function SegmentSimulator({
           }
         }
 
-        const padX = 6;
-        const usableWidth = width - padX * 2;
-        const barWidth = Math.max(1, (spec.len / maxLen) * usableWidth);
-        const ledHeight = compact ? 16 : 22;
-        const yTop = idx * rowHeight + (rowHeight - ledHeight) / 2;
+        const scale = globalBri * segBri;
+        for (let d = 0; d < ledCount; d++) {
+          let r = 18;
+          let g = 22;
+          let b = 34;
 
-        ctx.fillStyle = "rgba(4, 7, 15, 0.98)";
-        ctx.fillRect(padX, yTop - 2, barWidth, ledHeight + 4);
-
-        const { oc, octx, img } = offscreens[idx];
-        if (octx && img) {
-          const data = img.data;
-          const rowStride = oc.width * 4;
-          const scale = globalBri * segBri;
-          for (let d = 0; d < ledCount; d++) {
-            let r = 16;
-            let g = 20;
-            let b = 32;
-
-            if (liveBytes && liveLedCount > 0) {
-              const globalLed = spec.start + d;
-              const streamIdx = Math.min(
-                liveLedCount - 1,
-                Math.floor((globalLed / Math.max(1, totalLeds)) * liveLedCount)
-              );
-              r = liveBytes[streamIdx * 3];
-              g = liveBytes[streamIdx * 3 + 1];
-              b = liveBytes[streamIdx * 3 + 2];
-            } else if (globalOn) {
-              const mappedIdx = applySegmentTransform(d, ledCount, segPayload);
-              if (mappedIdx >= 0) {
-                r = Math.round(buf.pixels[mappedIdx * 3] * scale);
-                g = Math.round(buf.pixels[mappedIdx * 3 + 1] * scale);
-                b = Math.round(buf.pixels[mappedIdx * 3 + 2] * scale);
-              }
+          if (liveBytes && liveLedCount > 0) {
+            const globalLed = spec.start + d;
+            const streamIdx = Math.min(
+              liveLedCount - 1,
+              Math.floor((globalLed / Math.max(1, totalLeds)) * liveLedCount)
+            );
+            r = liveBytes[streamIdx * 3];
+            g = liveBytes[streamIdx * 3 + 1];
+            b = liveBytes[streamIdx * 3 + 2];
+          } else if (globalOn) {
+            const mappedIdx = applySegmentTransform(d, ledCount, segPayload);
+            if (mappedIdx >= 0) {
+              r = Math.round(buf.pixels[mappedIdx * 3] * scale);
+              g = Math.round(buf.pixels[mappedIdx * 3 + 1] * scale);
+              b = Math.round(buf.pixels[mappedIdx * 3 + 2] * scale);
             }
-
-            // Soften unlit/dim pixels to dark diode housing
-            const coreR = Math.max(16, r);
-            const coreG = Math.max(20, g);
-            const coreB = Math.max(32, b);
-            const edgeR = Math.max(10, (coreR * 0.6) | 0);
-            const edgeG = Math.max(13, (coreG * 0.6) | 0);
-            const edgeB = Math.max(22, (coreB * 0.6) | 0);
-            const baseX = d * cellW * 4;
-
-            // Row 0 & Row 2: top/bottom diode bezel + dark gap at col 3
-            for (const row of [0, 2]) {
-              const rowOff = row * rowStride + baseX;
-              for (let c = 0; c < 3; c++) {
-                const p = rowOff + c * 4;
-                data[p] = edgeR;
-                data[p + 1] = edgeG;
-                data[p + 2] = edgeB;
-                data[p + 3] = 255;
-              }
-              const gap = rowOff + 12;
-              data[gap] = 6;
-              data[gap + 1] = 8;
-              data[gap + 2] = 14;
-              data[gap + 3] = 255;
-            }
-
-            // Row 1: bright diode core at cols 0-2 + dark gap at col 3
-            const midOff = rowStride + baseX;
-            for (let c = 0; c < 3; c++) {
-              const p = midOff + c * 4;
-              data[p] = coreR;
-              data[p + 1] = coreG;
-              data[p + 2] = coreB;
-              data[p + 3] = 255;
-            }
-            const midGap = midOff + 12;
-            data[midGap] = 6;
-            data[midGap + 1] = 8;
-            data[midGap + 2] = 14;
-            data[midGap + 3] = 255;
           }
-          octx.putImageData(img, 0, 0);
-          ctx.drawImage(oc, padX, yTop, barWidth, ledHeight);
+
+          const coreR = Math.max(18, r);
+          const coreG = Math.max(22, g);
+          const coreB = Math.max(34, b);
+
+          const col = d % cols;
+          const row = Math.floor(d / cols);
+          const x0 = padX + col * ledPitch;
+          const y0 = startY + row * rowPitch;
+
+          for (let py = 0; py < ledSize; py++) {
+            const rowOffset = (y0 + py) * canvasWidth;
+            for (let px = 0; px < ledSize; px++) {
+              const m = circleMask[py * ledSize + px];
+              if (m < 0) continue;
+              const p = (rowOffset + x0 + px) * 4;
+              data[p] = (coreR * m) | 0;
+              data[p + 1] = (coreG * m) | 0;
+              data[p + 2] = (coreB * m) | 0;
+            }
+          }
         }
       });
 
+      ctx.putImageData(img, 0, 0);
       rafId = requestAnimationFrame(render);
     };
 
     rafId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(rafId);
-  }, [activeSegments, refLen, payload, segmentMode, effectNames, paletteNames, paletteColors, compact, globalOn, globalBri, useLive, totalLeds]);
+  }, [activeSegments, segmentLayout, canvasWidth, canvasHeight, cols, ledPitch, ledSize, rowPitch, refLen, payload, segmentMode, effectNames, paletteNames, paletteColors, compact, globalOn, globalBri, useLive, totalLeds]);
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-950/90 p-3 space-y-2">
@@ -294,9 +294,9 @@ export function SegmentSimulator({
 
       <canvas
         ref={canvasRef}
-        width={Math.max(1440, Math.max(...activeSegments.map((s) => s.len), 1) * 4 + 12)}
-        height={activeSegments.length * (compact ? 34 : 46)}
-        className="w-full rounded-lg bg-black/90"
+        width={canvasWidth}
+        height={canvasHeight}
+        className="w-full rounded-lg bg-black/95"
       />
 
       <div className="flex flex-wrap gap-2 text-[10px] text-slate-400">
