@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Radio } from "lucide-react";
 import { SegmentSpec } from "../api";
 import { applySegmentTransform, WledSegmentBuffer } from "../utils/wledFxEngine";
@@ -32,11 +32,20 @@ export function SegmentSimulator({
   const liveFrameRef = useRef<Uint8Array | null>(null);
   const [useLive, setUseLive] = useState(defaultLive);
   const [liveConnected, setLiveConnected] = useState(false);
+  const [liveFailed, setLiveFailed] = useState(false);
 
-  const activeSegments =
-    segments.length > 0
-      ? segments
-      : [{ id: 0, start: 0, stop: 1078, len: 1078, name: "All LEDs" }];
+  const activeSegments = useMemo(
+    () =>
+      segments.length > 0
+        ? segments
+        : [{ id: 0, start: 0, stop: 1078, len: 1078, name: "All LEDs" }],
+    [segments]
+  );
+
+  const refLen = useMemo(() => {
+    const sortedLens = activeSegments.map((s) => s.len).sort((a, b) => a - b);
+    return sortedLens[Math.floor(sortedLens.length / 2)] || 1;
+  }, [activeSegments]);
 
   const totalLeds = activeSegments.reduce((sum, s) => sum + s.len, 0) || 1078;
   const rawSegs = Array.isArray(payload?.seg) ? payload.seg : [{}];
@@ -48,16 +57,27 @@ export function SegmentSimulator({
     if (!useLive) {
       liveFrameRef.current = null;
       setLiveConnected(false);
+      setLiveFailed(false);
       return;
     }
 
+    setLiveFailed(false);
     const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(`${wsProto}//${window.location.host}/api/controller/live-stream`);
     ws.binaryType = "arraybuffer";
 
-    ws.onopen = () => setLiveConnected(true);
-    ws.onclose = () => setLiveConnected(false);
-    ws.onerror = () => setLiveConnected(false);
+    ws.onopen = () => {
+      setLiveConnected(true);
+      setLiveFailed(false);
+    };
+    ws.onclose = () => {
+      setLiveConnected(false);
+      setLiveFailed(true);
+    };
+    ws.onerror = () => {
+      setLiveConnected(false);
+      setLiveFailed(true);
+    };
     ws.onmessage = (evt) => {
       if (evt.data instanceof ArrayBuffer) {
         const bytes = new Uint8Array(evt.data);
@@ -81,12 +101,25 @@ export function SegmentSimulator({
 
     const maxLen = Math.max(...activeSegments.map((s) => s.len), 1);
     const buffers = activeSegments.map((spec) => new WledSegmentBuffer(spec.len));
+    const offscreens = activeSegments.map((spec) => {
+      const oc = document.createElement("canvas");
+      oc.width = Math.max(1, spec.len);
+      oc.height = 1;
+      const octx = oc.getContext("2d");
+      const img = octx ? octx.createImageData(oc.width, 1) : null;
+      return { oc, octx, img };
+    });
 
     let rafId = 0;
     const startMs = performance.now();
     let lastTickMs = 0;
 
     const render = (nowMs: number) => {
+      if (document.hidden) {
+        rafId = requestAnimationFrame(render);
+        return;
+      }
+
       const timeSec = (nowMs - startMs) / 1000;
       const width = canvas.width;
       const height = canvas.height;
@@ -101,12 +134,11 @@ export function SegmentSimulator({
       }
 
       ctx.clearRect(0, 0, width, height);
+      ctx.imageSmoothingEnabled = false;
 
       activeSegments.forEach((spec, idx) => {
         const baseSeg =
           segmentMode === "custom" && rawSegs[idx] ? rawSegs[idx] : rawSegs[0] || {};
-        const sortedLens = [...activeSegments].map((s) => s.len).sort((a, b) => a - b);
-        const refLen = sortedLens[Math.floor(sortedLens.length / 2)] || spec.len;
         const ratio = segmentMode === "normalized" && refLen > 0 ? spec.len / refLen : 1;
         const segPayload =
           segmentMode === "normalized"
@@ -135,39 +167,47 @@ export function SegmentSimulator({
         const padX = 4;
         const usableWidth = width - padX * 2;
         const barWidth = Math.max(1, (spec.len / maxLen) * usableWidth);
-        const ledStep = barWidth / ledCount;
         const ledHeight = compact ? 6 : 10;
         const yTop = idx * rowHeight + (rowHeight - ledHeight) / 2;
 
         ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
         ctx.fillRect(padX, yTop - 1, barWidth, ledHeight + 2);
 
-        for (let d = 0; d < ledCount; d++) {
-          let r = 12;
-          let g = 16;
-          let b = 24;
+        const { oc, octx, img } = offscreens[idx];
+        if (octx && img) {
+          const data = img.data;
+          const scale = globalBri * segBri;
+          for (let d = 0; d < ledCount; d++) {
+            let r = 12;
+            let g = 16;
+            let b = 24;
 
-          if (liveBytes && liveLedCount > 0) {
-            const globalLed = spec.start + d;
-            const streamIdx = Math.min(
-              liveLedCount - 1,
-              Math.floor((globalLed / Math.max(1, totalLeds)) * liveLedCount)
-            );
-            r = liveBytes[streamIdx * 3];
-            g = liveBytes[streamIdx * 3 + 1];
-            b = liveBytes[streamIdx * 3 + 2];
-          } else if (globalOn) {
-            const mappedIdx = applySegmentTransform(d, ledCount, segPayload);
-            if (mappedIdx >= 0) {
-              const scale = globalBri * segBri;
-              r = Math.round(buf.pixels[mappedIdx * 3] * scale);
-              g = Math.round(buf.pixels[mappedIdx * 3 + 1] * scale);
-              b = Math.round(buf.pixels[mappedIdx * 3 + 2] * scale);
+            if (liveBytes && liveLedCount > 0) {
+              const globalLed = spec.start + d;
+              const streamIdx = Math.min(
+                liveLedCount - 1,
+                Math.floor((globalLed / Math.max(1, totalLeds)) * liveLedCount)
+              );
+              r = liveBytes[streamIdx * 3];
+              g = liveBytes[streamIdx * 3 + 1];
+              b = liveBytes[streamIdx * 3 + 2];
+            } else if (globalOn) {
+              const mappedIdx = applySegmentTransform(d, ledCount, segPayload);
+              if (mappedIdx >= 0) {
+                r = Math.round(buf.pixels[mappedIdx * 3] * scale);
+                g = Math.round(buf.pixels[mappedIdx * 3 + 1] * scale);
+                b = Math.round(buf.pixels[mappedIdx * 3 + 2] * scale);
+              }
             }
-          }
 
-          ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-          ctx.fillRect(padX + d * ledStep, yTop, Math.max(1, ledStep), ledHeight);
+            const p = d * 4;
+            data[p] = r;
+            data[p + 1] = g;
+            data[p + 2] = b;
+            data[p + 3] = 255;
+          }
+          octx.putImageData(img, 0, 0);
+          ctx.drawImage(oc, padX, yTop, barWidth, ledHeight);
         }
       });
 
@@ -176,7 +216,7 @@ export function SegmentSimulator({
 
     rafId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(rafId);
-  }, [activeSegments, payload, segmentMode, effectNames, paletteNames, paletteColors, compact, globalOn, globalBri, useLive, totalLeds]);
+  }, [activeSegments, refLen, payload, segmentMode, effectNames, paletteNames, paletteColors, compact, globalOn, globalBri, useLive, totalLeds]);
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-950/90 p-3 space-y-2">
@@ -197,10 +237,16 @@ export function SegmentSimulator({
                     : "border-amber-500/50 bg-amber-500/15 text-amber-300"
                   : "border-slate-700 bg-slate-900 text-slate-400 hover:text-white"
               }`}
-              title="Toggle between live pixel stream from 192.168.68.200 and local WLED FX simulation"
+              title="Toggle between live pixel stream from WLED controller and local WLED FX simulation"
             >
               <Radio className="h-3 w-3" />
-              {useLive ? (liveConnected ? "LIVE WLED" : "Connecting WLED...") : "Simulated (Click for Live)"}
+              {useLive
+                ? liveConnected
+                  ? "LIVE WLED"
+                  : liveFailed
+                    ? "Live Disconnected (Click to Sim)"
+                    : "Connecting WLED..."
+                : "Simulated (Click for Live)"}
             </button>
           )}
           <span className="uppercase tracking-wider text-[10px] text-sky-400">{segmentMode}</span>

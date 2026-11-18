@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, Play, Plus, Search, Sliders, Trash2, UploadCloud } from "lucide-react";
 import { api, ControllerProfile, EffectRecord } from "../api";
 import { SegmentSimulator } from "../components/SegmentSimulator";
@@ -11,8 +11,12 @@ interface Props {
   onRefresh: () => void;
 }
 
+const PAGE_SIZE = 24;
+
 export function EffectsPage({ effects, profile, onRefresh }: Props) {
   const [query, setQuery] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
   const [editing, setEditing] = useState<{ effect: EffectRecord; isNew: boolean } | null>(null);
   const [previewEffect, setPreviewEffect] = useState<EffectRecord | null>(null);
   const [savingEffect, setSavingEffect] = useState<EffectRecord | null>(null);
@@ -21,11 +25,24 @@ export function EffectsPage({ effects, profile, onRefresh }: Props) {
   const [saveName, setSaveName] = useState<string>("");
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
-  const filtered = effects.filter(
-    (e) =>
+  useEffect(() => {
+    if (!savingEffect) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSavingEffect(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [savingEffect]);
+
+  const filtered = effects.filter((e) => {
+    const matchesSource = sourceFilter === "all" || e.source_type === sourceFilter;
+    const matchesQuery =
+      !query.trim() ||
       e.name.toLowerCase().includes(query.toLowerCase()) ||
-      e.tags.some((t) => t.toLowerCase().includes(query.toLowerCase()))
-  );
+      e.tags.some((t) => t.toLowerCase().includes(query.toLowerCase()));
+    return matchesSource && matchesQuery;
+  });
+  const visibleEffects = filtered.slice(0, visibleCount);
 
   const handleTest = async (id: number) => {
     try {
@@ -36,10 +53,19 @@ export function EffectsPage({ effects, profile, onRefresh }: Props) {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    await api.deleteEffect(id);
-    if (editing?.effect.id === id) setEditing(null);
-    onRefresh();
+  const handleDelete = async (eff: EffectRecord) => {
+    if (!window.confirm(`Delete "${eff.name}" from your library? Any schedule rules using it will also be removed.`)) {
+      return;
+    }
+    try {
+      await api.deleteEffect(eff.id);
+      if (editing?.effect.id === eff.id) setEditing(null);
+      if (previewEffect?.id === eff.id) setPreviewEffect(null);
+      setStatusMsg(`Deleted "${eff.name}"`);
+      onRefresh();
+    } catch (e: any) {
+      setStatusMsg(`Error: ${e.message}`);
+    }
   };
 
   const openNewEffect = () => {
@@ -105,14 +131,45 @@ export function EffectsPage({ effects, profile, onRefresh }: Props) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search effects or tags..."
-            className="w-full rounded-xl border border-slate-800 bg-slate-900 pl-9 pr-4 py-2 text-sm focus:border-sky-500 focus:outline-none"
-          />
+        <div className="flex flex-wrap items-center gap-2 flex-1">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setVisibleCount(PAGE_SIZE);
+              }}
+              placeholder="Search effects or tags..."
+              className="w-full rounded-xl border border-slate-800 bg-slate-900 pl-9 pr-4 py-2 text-sm focus:border-sky-500 focus:outline-none"
+            />
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {[
+              { key: "all", label: "All" },
+              { key: "curated", label: "Curated" },
+              { key: "wled_preset", label: "Controller" },
+              { key: "manual", label: "Custom" },
+              { key: "url", label: "URL" },
+              { key: "json", label: "JSON" },
+            ].map((pill) => (
+              <button
+                key={pill.key}
+                type="button"
+                onClick={() => {
+                  setSourceFilter(pill.key);
+                  setVisibleCount(PAGE_SIZE);
+                }}
+                className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+                  sourceFilter === pill.key
+                    ? "bg-sky-500 text-slate-950"
+                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                }`}
+              >
+                {pill.label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           {statusMsg && <span className="text-xs text-sky-300">{statusMsg}</span>}
@@ -140,7 +197,7 @@ export function EffectsPage({ effects, profile, onRefresh }: Props) {
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((eff) => {
+        {visibleEffects.map((eff) => {
           const seg0 = eff.payload?.seg?.[0] || {};
           const fxId = Number(seg0.fx ?? 0);
           const palId = Number(seg0.pal ?? 0);
@@ -205,13 +262,15 @@ export function EffectsPage({ effects, profile, onRefresh }: Props) {
                   <button
                     onClick={() => openSaveToWled(eff)}
                     className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-emerald-300"
+                    aria-label={`Save ${eff.name} to WLED controller`}
                     title="Save / update preset on WLED controller"
                   >
                     <UploadCloud className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    onClick={() => handleDelete(eff.id)}
+                    onClick={() => handleDelete(eff)}
                     className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-rose-400"
+                    aria-label={`Delete ${eff.name}`}
                     title="Delete effect"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -222,6 +281,25 @@ export function EffectsPage({ effects, profile, onRefresh }: Props) {
           );
         })}
       </div>
+
+      {filtered.length > visibleEffects.length && (
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+            className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800"
+          >
+            Show More ({visibleEffects.length} of {filtered.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setVisibleCount(filtered.length)}
+            className="rounded-xl border border-slate-800 px-3 py-2 text-xs text-slate-400 hover:text-slate-200"
+          >
+            Show All
+          </button>
+        </div>
+      )}
 
       {filtered.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-800 p-10 text-center text-sm text-slate-400">
@@ -245,8 +323,17 @@ export function EffectsPage({ effects, profile, onRefresh }: Props) {
       )}
       {/* Save / Update Preset on WLED Controller Modal */}
       {savingEffect && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Save Preset to WLED"
+          onClick={() => setSavingEffect(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4"
+          >
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <UploadCloud className="h-5 w-5 text-emerald-400" /> Save Preset to WLED

@@ -36,6 +36,16 @@ export function CalendarPage({ effects, profile }: Props) {
   const [offsetMinutes, setOffsetMinutes] = useState(0);
   const [busy, setBusy] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
+  const [showRuleModal, setShowRuleModal] = useState(false);
+  const [newRuleType, setNewRuleType] = useState<"date_range" | "day_of_week" | "holiday" | "default">("date_range");
+  const [ruleStartDate, setRuleStartDate] = useState("");
+  const [ruleEndDate, setRuleEndDate] = useState("");
+  const [ruleDaysOfWeek, setRuleDaysOfWeek] = useState<number[]>([4, 5]);
+  const [ruleHolidayName, setRuleHolidayName] = useState("");
+  const [ruleEffectId, setRuleEffectId] = useState<number>(0);
+  const [ruleTriggerType, setRuleTriggerType] = useState<"sunset" | "sunrise" | "fixed_time">("sunset");
+  const [ruleTriggerTime, setRuleTriggerTime] = useState("18:00");
+  const [ruleOffsetMinutes, setRuleOffsetMinutes] = useState(0);
 
   const loadMonth = async () => {
     const [mRes, rRes] = await Promise.all([api.getMonthSchedule(year, month), api.listRules()]);
@@ -52,10 +62,20 @@ export function CalendarPage({ effects, profile }: Props) {
   }, [year, month]);
 
   useEffect(() => {
-    if (effects.length > 0 && selectedEffectId === 0) {
-      setSelectedEffectId(effects[0].id);
+    if (effects.length > 0) {
+      if (selectedEffectId === 0) setSelectedEffectId(effects[0].id);
+      if (ruleEffectId === 0) setRuleEffectId(effects[0].id);
     }
   }, [effects]);
+
+  useEffect(() => {
+    if (!showRuleModal) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowRuleModal(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showRuleModal]);
 
   const prevMonth = () => {
     if (month === 1) {
@@ -95,6 +115,45 @@ export function CalendarPage({ effects, profile }: Props) {
       });
       setBanner(`Scheduled effect for ${selectedDay.date}`);
       await loadMonth();
+    } catch (e: any) {
+      setBanner(`Error: ${e.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCreateAdvancedRule = async () => {
+    if (!ruleEffectId) return;
+    if (newRuleType === "date_range" && (!ruleStartDate || !ruleEndDate)) {
+      setBanner("Error: Please select both start and end dates.");
+      return;
+    }
+    if (newRuleType === "day_of_week" && ruleDaysOfWeek.length === 0) {
+      setBanner("Error: Select at least one day of the week.");
+      return;
+    }
+    if (newRuleType === "holiday" && !ruleHolidayName.trim()) {
+      setBanner("Error: Enter a holiday name to match.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.createRule({
+        rule_type: newRuleType,
+        start_date: newRuleType === "date_range" ? ruleStartDate : null,
+        end_date: newRuleType === "date_range" ? ruleEndDate : null,
+        days_of_week: newRuleType === "day_of_week" ? ruleDaysOfWeek : [],
+        holiday_name: newRuleType === "holiday" ? ruleHolidayName.trim() : null,
+        effect_id: ruleEffectId,
+        trigger_type: ruleTriggerType,
+        trigger_time: ruleTriggerType === "fixed_time" ? ruleTriggerTime : null,
+        offset_minutes: ruleOffsetMinutes,
+      });
+      setShowRuleModal(false);
+      setBanner(`Saved ${newRuleType.replace("_", " ")} rule.`);
+      await loadMonth();
+    } catch (e: any) {
+      setBanner(`Error: ${e.message}`);
     } finally {
       setBusy(false);
     }
@@ -113,17 +172,29 @@ export function CalendarPage({ effects, profile }: Props) {
   };
 
   const handleDeleteRule = async (ruleId: number) => {
+    if (!window.confirm("Delete this schedule rule?")) return;
     setBusy(true);
     try {
       await api.deleteRule(ruleId);
       await loadMonth();
+    } catch (e: any) {
+      setBanner(`Error: ${e.message}`);
     } finally {
       setBusy(false);
     }
   };
 
   const monthLabel = new Date(year, month - 1, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
-  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const todayIso = (() => {
+    if (profile?.timezone) {
+      try {
+        return new Intl.DateTimeFormat("en-CA", { timeZone: profile.timezone }).format(now);
+      } catch {
+        // fallback to browser local date
+      }
+    }
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  })();
 
   return (
     <div className="space-y-6">
@@ -133,7 +204,12 @@ export function CalendarPage({ effects, profile }: Props) {
           <h2 className="text-xl font-semibold">{monthLabel}</h2>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={prevMonth} className="rounded-lg border border-slate-700 bg-slate-900 p-2 hover:bg-slate-800">
+          <button
+            onClick={prevMonth}
+            aria-label="Previous month"
+            title="Previous month"
+            className="rounded-lg border border-slate-700 bg-slate-900 p-2 hover:bg-slate-800"
+          >
             <ChevronLeft className="h-4 w-4" />
           </button>
           <button
@@ -145,7 +221,12 @@ export function CalendarPage({ effects, profile }: Props) {
           >
             Today
           </button>
-          <button onClick={nextMonth} className="rounded-lg border border-slate-700 bg-slate-900 p-2 hover:bg-slate-800">
+          <button
+            onClick={nextMonth}
+            aria-label="Next month"
+            title="Next month"
+            className="rounded-lg border border-slate-700 bg-slate-900 p-2 hover:bg-slate-800"
+          >
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
@@ -410,7 +491,17 @@ export function CalendarPage({ effects, profile }: Props) {
 
           {/* Active Rules List */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-slate-200">Active Schedule Rules ({rules.length})</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-slate-200">Active Schedule Rules ({rules.length})</h3>
+              <button
+                type="button"
+                disabled={effects.length === 0}
+                onClick={() => setShowRuleModal(true)}
+                className="flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-medium text-sky-300 hover:bg-slate-700 disabled:opacity-50"
+              >
+                <Plus className="h-3.5 w-3.5" /> New Rule
+              </button>
+            </div>
             <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
               {rules.map((r, idx) => {
                 const isShadowed =
@@ -436,23 +527,208 @@ export function CalendarPage({ effects, profile }: Props) {
                           ? r.start_date
                           : r.rule_type === "date_range"
                             ? `${r.start_date} → ${r.end_date}`
-                            : r.rule_type === "default"
-                              ? "Daily Default"
-                              : r.rule_type}{" "}
+                            : r.rule_type === "day_of_week"
+                              ? r.days_of_week.map((d) => WEEKDAYS[d] ?? d).join(", ")
+                              : r.rule_type === "holiday"
+                                ? `Holiday: ${r.holiday_name}`
+                                : r.rule_type === "default"
+                                  ? "Daily Default"
+                                  : r.rule_type}{" "}
                         · <span className="text-sky-300 font-medium">{formatRuleTrigger(r)}</span>
                       </div>
                     </div>
-                    <button onClick={() => handleDeleteRule(r.id)} className="text-slate-500 hover:text-rose-400 shrink-0">
+                    <button
+                      onClick={() => handleDeleteRule(r.id)}
+                      aria-label={`Delete rule for ${r.effect_name}`}
+                      title="Delete rule"
+                      className="text-slate-500 hover:text-rose-400 shrink-0"
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 );
               })}
-              {rules.length === 0 && <p className="text-xs text-slate-500">No rules yet. Add a default rule in Settings or click a date.</p>}
+              {rules.length === 0 && <p className="text-xs text-slate-500">No rules yet. Add a rule or click a date.</p>}
             </div>
           </div>
         </div>
       </div>
+
+      {showRuleModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Create Schedule Rule"
+          onClick={() => setShowRuleModal(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Create Schedule Rule</h3>
+              <button
+                type="button"
+                onClick={() => setShowRuleModal(false)}
+                aria-label="Close modal"
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div>
+                <label className="text-xs text-slate-400">Rule Type</label>
+                <select
+                  value={newRuleType}
+                  onChange={(e) => setNewRuleType(e.target.value as any)}
+                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
+                >
+                  <option value="date_range">Date Range (e.g. Holiday Season)</option>
+                  <option value="day_of_week">Days of Week (e.g. Weekends)</option>
+                  <option value="holiday">Holiday Name Match (from ICS)</option>
+                  <option value="default">Daily Default</option>
+                </select>
+              </div>
+
+              {newRuleType === "date_range" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-slate-400">Start Date</label>
+                    <input
+                      type="date"
+                      value={ruleStartDate}
+                      onChange={(e) => setRuleStartDate(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400">End Date</label>
+                    <input
+                      type="date"
+                      value={ruleEndDate}
+                      onChange={(e) => setRuleEndDate(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {newRuleType === "day_of_week" && (
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1.5">Active Days</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WEEKDAYS.map((wd, idx) => {
+                      const active = ruleDaysOfWeek.includes(idx);
+                      return (
+                        <button
+                          key={wd}
+                          type="button"
+                          onClick={() =>
+                            setRuleDaysOfWeek((prev) =>
+                              prev.includes(idx) ? prev.filter((d) => d !== idx) : [...prev, idx].sort()
+                            )
+                          }
+                          className={`rounded-lg px-2.5 py-1 text-xs font-medium border ${
+                            active
+                              ? "border-sky-400 bg-sky-500/20 text-sky-200"
+                              : "border-slate-700 bg-slate-950 text-slate-400"
+                          }`}
+                        >
+                          {wd}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {newRuleType === "holiday" && (
+                <div>
+                  <label className="text-xs text-slate-400">Holiday Name (substring match)</label>
+                  <input
+                    value={ruleHolidayName}
+                    onChange={(e) => setRuleHolidayName(e.target.value)}
+                    placeholder="e.g. Thanksgiving"
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs text-slate-400">Effect</label>
+                <select
+                  value={ruleEffectId}
+                  onChange={(e) => setRuleEffectId(Number(e.target.value))}
+                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
+                >
+                  {effects.map((eff) => (
+                    <option key={eff.id} value={eff.id}>
+                      {eff.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-slate-400">When</label>
+                  <select
+                    value={ruleTriggerType}
+                    onChange={(e) => setRuleTriggerType(e.target.value as any)}
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs"
+                  >
+                    <option value="sunset">At Sunset</option>
+                    <option value="sunrise">At Sunrise</option>
+                    <option value="fixed_time">Fixed Time</option>
+                  </select>
+                </div>
+                {ruleTriggerType === "fixed_time" ? (
+                  <div>
+                    <label className="text-xs text-slate-400">Time</label>
+                    <input
+                      type="time"
+                      value={ruleTriggerTime}
+                      onChange={(e) => setRuleTriggerTime(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-xs text-slate-400">Offset (min)</label>
+                    <input
+                      type="number"
+                      value={ruleOffsetMinutes}
+                      onChange={(e) => setRuleOffsetMinutes(Number(e.target.value))}
+                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowRuleModal(false)}
+                className="rounded-lg border border-slate-700 px-4 py-2 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={handleCreateAdvancedRule}
+                className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
+              >
+                Save Rule
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

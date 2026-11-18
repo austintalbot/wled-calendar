@@ -10,7 +10,8 @@ from pydantic import BaseModel, Field
 import websockets
 
 from backend.db import get_conn, get_controller_profile, log_execution, row_to_effect, save_controller_profile, utc_now_iso
-from backend.models import ControllerSettingsUpdate
+from backend.models import ControllerSettingsUpdate, SegmentMode
+from backend.scheduler import reconfigure_scheduler
 from backend.wled_client import (
     adapt_payload_to_controller,
     apply_state,
@@ -29,6 +30,7 @@ class ApplyRequest(BaseModel):
 
     effect_id: int | None = None
     payload: dict[str, Any] | None = None
+    segment_mode: SegmentMode = "mirror"
     brightness_override: int | None = None
 
 
@@ -101,6 +103,7 @@ async def update_controller_settings(body: ControllerSettingsUpdate) -> dict[str
     if body.timezone is not None:
         profile.timezone = body.timezone.strip()
     saved = save_controller_profile(profile)
+    reconfigure_scheduler()
     return {"profile": saved.model_dump()}
 
 
@@ -163,6 +166,7 @@ async def apply_now(body: ApplyRequest) -> dict[str, Any]:
         payload = adapt_payload_to_controller(
             body.payload,
             profile,
+            segment_mode=body.segment_mode,
             brightness_override=body.brightness_override,
         )
     else:
@@ -202,6 +206,10 @@ async def live_stream(websocket: WebSocket) -> None:
             _, pending = await asyncio.wait({t1, t2}, return_when=asyncio.FIRST_COMPLETED)
             for task in pending:
                 task.cancel()
+            try:
+                await wled_ws.send('{"lv":false}')
+            except Exception:
+                pass
     except (WebSocketDisconnect, Exception):
         pass
     finally:

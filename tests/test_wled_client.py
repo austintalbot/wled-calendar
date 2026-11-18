@@ -157,6 +157,27 @@ async def test_save_and_delete_controller_preset() -> None:
     assert '"pdel":7' in second_body.replace(" ", "")
 
 
+def test_adapt_preserves_playlist_and_zero_brightness_segment() -> None:
+    profile = _sample_profile()
+    playlist_preset = {
+        "on": True,
+        "bri": 180,
+        "playlist": {"ps": [1, 2, 3], "dur": [100, 100, 100], "repeat": 0},
+    }
+    adapted_pl = adapt_payload_to_controller(playlist_preset, profile)
+    assert adapted_pl["playlist"] == playlist_preset["playlist"]
+    assert "seg" not in adapted_pl
+
+    off_seg_preset = {
+        "on": True,
+        "bri": 200,
+        "seg": [{"on": False, "bri": 0, "fx": 0, "col": [[0, 0, 0]]}],
+    }
+    adapted_off = adapt_payload_to_controller(off_seg_preset, profile)
+    assert adapted_off["seg"][0]["on"] is False
+    assert adapted_off["seg"][0]["bri"] == 0
+
+
 def test_adapt_normalized_scales_speed_and_intensity_by_segment_length() -> None:
     profile = _sample_profile()
     preset = {"bri": 255, "seg": [{"fx": 2, "pal": 2, "sx": 100, "ix": 100}]}

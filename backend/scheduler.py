@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -243,14 +243,18 @@ async def sync_due_feeds() -> None:
         feeds = conn.execute("SELECT * FROM ics_feeds WHERE enabled = 1").fetchall()
         effects = [row_to_effect(r) for r in conn.execute("SELECT * FROM effects").fetchall()]
 
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     for feed in feeds:
         last_synced = feed["last_synced_at"]
         interval = int(feed["sync_interval_minutes"] or 30)
         if last_synced:
             try:
                 last_dt = datetime.fromisoformat(last_synced)
-                if (now - last_dt.replace(tzinfo=None)).total_seconds() < interval * 60:
+                if last_dt.tzinfo is None:
+                    last_dt = last_dt.replace(tzinfo=timezone.utc)
+                else:
+                    last_dt = last_dt.astimezone(timezone.utc)
+                if (now - last_dt).total_seconds() < interval * 60:
                     continue
             except ValueError:
                 pass
@@ -313,37 +317,42 @@ def refresh_daily_jobs() -> None:
     today = now.date()
     summary = resolve_day_schedule(today, profile)
 
+    baseline_trigger_dt: datetime | None = None
     if summary.effect_id and summary.trigger_time_resolved:
-        # Recompute exact datetime for today's baseline
-        with get_conn() as conn:
-            rule_rows = conn.execute(
-                """
-                SELECT r.*, e.name AS effect_name
-                FROM schedule_rules r
-                JOIN effects e ON e.id = r.effect_id
-                WHERE r.enabled = 1
-                ORDER BY r.priority DESC, r.id DESC
-                """
-            ).fetchall()
-        rules = [row_to_rule(r) for r in rule_rows]
-        matching = [r for r in rules if _rule_matches_date(r, today, summary.all_day_events)]
-        top_rule = matching[0] if matching else None
-        trigger_dt = compute_trigger_datetime(
+        is_google_all_day = bool(summary.source and summary.source.startswith("google_all_day"))
+        top_rule: dict[str, Any] | None = None
+        if not is_google_all_day:
+            with get_conn() as conn:
+                rule_rows = conn.execute(
+                    """
+                    SELECT r.*, e.name AS effect_name
+                    FROM schedule_rules r
+                    JOIN effects e ON e.id = r.effect_id
+                    WHERE r.enabled = 1
+                    ORDER BY r.priority DESC, r.id DESC
+                    """
+                ).fetchall()
+            rules = [row_to_rule(r) for r in rule_rows]
+            matching = [r for r in rules if _rule_matches_date(r, today, summary.all_day_events)]
+            explicit_date_rule = next((r for r in matching if r["rule_type"] == "date"), None)
+            top_rule = explicit_date_rule or (matching[0] if matching else None)
+
+        baseline_trigger_dt = compute_trigger_datetime(
             today,
             summary.trigger_type or "sunset",
             top_rule["trigger_time"] if top_rule else None,
             top_rule["offset_minutes"] if top_rule else 0,
             profile,
         )
-        if trigger_dt > now:
+        if baseline_trigger_dt > now:
             _scheduler.add_job(
                 execute_effect_job,
-                trigger=DateTrigger(run_date=trigger_dt),
+                trigger=DateTrigger(run_date=baseline_trigger_dt),
                 id=f"daily_baseline_{today.isoformat()}",
                 args=[
                     summary.effect_id,
                     f"schedule:{summary.source}",
-                    trigger_dt.isoformat(),
+                    baseline_trigger_dt.isoformat(),
                     top_rule["brightness_override"] if top_rule else None,
                 ],
                 replace_existing=True,
@@ -363,7 +372,12 @@ def refresh_daily_jobs() -> None:
                 args=[ev.matched_effect_id, f"gcal:{ev.summary}", start_dt.isoformat()],
                 replace_existing=True,
             )
-        if summary.effect_id and end_dt > now and end_dt.date() == today:
+        if (
+            summary.effect_id
+            and end_dt > now
+            and end_dt.date() == today
+            and (baseline_trigger_dt is None or end_dt >= baseline_trigger_dt)
+        ):
             _scheduler.add_job(
                 execute_effect_job,
                 trigger=DateTrigger(run_date=end_dt),
@@ -373,23 +387,37 @@ def refresh_daily_jobs() -> None:
             )
 
 
+def _register_system_jobs(sched: AsyncIOScheduler, tz: ZoneInfo) -> None:
+    """Register or update recurring system jobs in the controller timezone."""
+    sched.add_job(
+        refresh_daily_jobs,
+        trigger=CronTrigger(hour=0, minute=1, timezone=tz),
+        id="system_midnight_refresh",
+        replace_existing=True,
+    )
+    sched.add_job(
+        sync_due_feeds,
+        trigger=CronTrigger(minute="*/15", timezone=tz),
+        id="system_feed_sync",
+        replace_existing=True,
+    )
+
+
+def reconfigure_scheduler() -> None:
+    """Re-register system jobs in the current controller timezone and refresh today's jobs."""
+    if _scheduler is not None:
+        tz = ZoneInfo(get_controller_profile().timezone)
+        _register_system_jobs(_scheduler, tz)
+    refresh_daily_jobs()
+
+
 def start_scheduler() -> AsyncIOScheduler:
     """Initialize and start APScheduler with midnight refresh and periodic feed sync."""
     global _scheduler
     if _scheduler is None:
-        _scheduler = AsyncIOScheduler()
-        _scheduler.add_job(
-            refresh_daily_jobs,
-            trigger=CronTrigger(hour=0, minute=1),
-            id="system_midnight_refresh",
-            replace_existing=True,
-        )
-        _scheduler.add_job(
-            sync_due_feeds,
-            trigger=CronTrigger(minute="*/15"),
-            id="system_feed_sync",
-            replace_existing=True,
-        )
+        tz = ZoneInfo(get_controller_profile().timezone)
+        _scheduler = AsyncIOScheduler(timezone=tz)
+        _register_system_jobs(_scheduler, tz)
         _scheduler.start()
     refresh_daily_jobs()
     return _scheduler

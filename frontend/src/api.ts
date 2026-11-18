@@ -148,6 +148,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ effect_id: effectId, brightness_override: brightnessOverride }),
     }),
+  applyPayloadNow: (
+    payload: Record<string, any>,
+    segmentMode: "mirror" | "custom" | "normalized" = "mirror",
+    brightnessOverride?: number
+  ) =>
+    request<{ ok: boolean }>("/api/controller/apply", {
+      method: "POST",
+      body: JSON.stringify({ payload, segment_mode: segmentMode, brightness_override: brightnessOverride }),
+    }),
 
   listEffects: () => request<{ effects: EffectRecord[] }>("/api/effects"),
   createEffect: (data: Partial<EffectRecord>) =>
@@ -162,18 +171,18 @@ export const api = {
       body: JSON.stringify({ url, import_all: false }),
     }),
   commitUrlImport: (url: string, selectedKeys: string[]) =>
-    request<{ imported: EffectRecord[] }>("/api/effects/import/url", {
+    request<{ imported: EffectRecord[]; skipped?: number }>("/api/effects/import/url", {
       method: "POST",
       body: JSON.stringify({ url, selected_keys: selectedKeys }),
     }),
-  importJson: (name: string, rawJson: string, segmentMode: "mirror" | "custom") =>
+  importJson: (name: string, rawJson: string, segmentMode: "mirror" | "custom" | "normalized") =>
     request<{ imported: EffectRecord[] }>("/api/effects/import/json", {
       method: "POST",
       body: JSON.stringify({ name, raw_json: rawJson, segment_mode: segmentMode }),
     }),
   listCurated: () => request<{ curated: any[] }>("/api/effects/curated"),
   importCurated: (slugs: string[]) =>
-    request<{ imported: EffectRecord[] }>("/api/effects/import/curated", {
+    request<{ imported: EffectRecord[]; skipped?: number }>("/api/effects/import/curated", {
       method: "POST",
       body: JSON.stringify({ slugs }),
     }),
@@ -185,6 +194,8 @@ export const api = {
   listRules: () => request<{ rules: ScheduleRuleRecord[] }>("/api/schedule/rules"),
   createRule: (data: Partial<ScheduleRuleRecord>) =>
     request<{ rule: ScheduleRuleRecord }>("/api/schedule/rules", { method: "POST", body: JSON.stringify(data) }),
+  updateRule: (id: number, data: Partial<ScheduleRuleRecord>) =>
+    request<{ rule: ScheduleRuleRecord }>(`/api/schedule/rules/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteRule: (id: number) => request<{ deleted: boolean }>(`/api/schedule/rules/${id}`, { method: "DELETE" }),
   listLogs: () => request<{ logs: ExecutionLog[] }>("/api/schedule/logs"),
 
