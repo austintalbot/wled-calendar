@@ -83,7 +83,7 @@ export default function App() {
         {page === "effects" && (
           <EffectsPage effects={effects} profile={status?.profile || null} onRefresh={loadEffects} />
         )}
-        {page === "import" && <ImportPage onImported={loadEffects} />}
+        {page === "import" && <ImportPage profile={status?.profile || null} onImported={loadEffects} />}
         {page === "settings" && (
           <SettingsPage
             profile={status?.profile || null}

@@ -1,14 +1,40 @@
-import { useEffect, useState } from "react";
-import { CalendarPlus, Check, Code, Cpu, Download, Globe, RefreshCw, Sparkles, Trash2 } from "lucide-react";
-import { api, FeedRecord } from "../api";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarPlus, Check, Code, Cpu, Download, Eye, Globe, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { api, ControllerProfile, FeedRecord } from "../api";
+import { SegmentSimulator } from "../components/SegmentSimulator";
 
 interface Props {
+  profile: ControllerProfile | null;
   onImported: () => void;
+}
+
+type PreviewTarget = {
+  name: string;
+  payload: Record<string, any>;
+  segmentMode: "mirror" | "custom" | "normalized";
+};
+
+function parsePreviewFromJson(raw: string): Record<string, any> | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (!parsed || typeof parsed !== "object") return null;
+    if ("seg" in parsed || "fx" in parsed) return parsed;
+    for (const [k, v] of Object.entries(parsed)) {
+      if (k !== "0" && v && typeof v === "object" && ("seg" in v || "fx" in v)) {
+        return v as Record<string, any>;
+      }
+    }
+  } catch {
+    // ignore incomplete JSON while typing
+  }
+  return null;
 }
 
 type TabKey = "curated" | "url" | "json" | "controller" | "feeds";
 
-export function ImportPage({ onImported }: Props) {
+export function ImportPage({ profile, onImported }: Props) {
   const [tab, setTab] = useState<TabKey>("curated");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -30,9 +56,24 @@ export function ImportPage({ onImported }: Props) {
   const [feedName, setFeedName] = useState("My Google Calendar");
   const [feedType, setFeedType] = useState<"google_calendar" | "holiday_ics">("google_calendar");
   const [feedUrl, setFeedUrl] = useState("");
+  const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(null);
+
+  const jsonPreviewPayload = useMemo(() => parsePreviewFromJson(rawJson), [rawJson]);
 
   useEffect(() => {
-    api.listCurated().then((r) => setCurated(r.curated)).catch(console.error);
+    api
+      .listCurated()
+      .then((r) => {
+        setCurated(r.curated);
+        if (r.curated.length > 0) {
+          setPreviewTarget({
+            name: r.curated[0].name,
+            payload: r.curated[0].payload,
+            segmentMode: "mirror",
+          });
+        }
+      })
+      .catch(console.error);
     api.listFeeds().then((r) => setFeeds(r.feeds)).catch(console.error);
   }, []);
 
@@ -58,6 +99,13 @@ export function ImportPage({ onImported }: Props) {
       const res = await api.previewUrlImport(urlInput);
       setUrlPresets(res.presets);
       setSelectedKeys(res.presets.map((p) => p.key));
+      if (res.presets.length > 0) {
+        setPreviewTarget({
+          name: res.presets[0].name,
+          payload: res.presets[0].payload,
+          segmentMode: "mirror",
+        });
+      }
       setMessage(`Found ${res.presets.length} preset(s) from ${res.raw_url}`);
     } catch (e: any) {
       setMessage(`Error: ${e.message}`);
@@ -102,6 +150,13 @@ export function ImportPage({ onImported }: Props) {
     try {
       const res = await api.getControllerPresets();
       setCtrlPresets(res.presets);
+      if (res.presets.length > 0) {
+        setPreviewTarget({
+          name: res.presets[0].name,
+          payload: res.presets[0].payload,
+          segmentMode: "custom",
+        });
+      }
       setMessage(`Loaded ${res.presets.length} preset(s) from WLED controller.`);
     } catch (e: any) {
       setMessage(`Error: ${e.message}`);
@@ -199,6 +254,29 @@ export function ImportPage({ onImported }: Props) {
         </div>
       )}
 
+      {tab !== "feeds" &&
+        (() => {
+          const activePreview =
+            tab === "json" && jsonPreviewPayload
+              ? { name: jsonName || "JSON Preview", payload: jsonPreviewPayload, segmentMode: jsonSegMode }
+              : previewTarget;
+          if (!activePreview) return null;
+          return (
+            <div className="sticky top-[61px] z-30 -mx-2 px-2 py-2 bg-slate-950/95 backdrop-blur shadow-lg shadow-slate-950/60">
+              <SegmentSimulator
+                segments={profile?.segments || []}
+                payload={activePreview.payload}
+                segmentMode={activePreview.segmentMode}
+                effectNames={profile?.effects || []}
+                paletteNames={profile?.palettes || []}
+                paletteColors={profile?.palette_colors}
+                label={`Pre-Import Simulation: ${activePreview.name}`}
+                allowLiveToggle={false}
+              />
+            </div>
+          );
+        })()}
+
       {tab === "curated" && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -226,13 +304,29 @@ export function ImportPage({ onImported }: Props) {
                     <h3 className="font-semibold text-slate-100">{item.name}</h3>
                     <p className="mt-1 text-xs text-slate-400">{item.description}</p>
                   </div>
-                  <button
-                    disabled={busy}
-                    onClick={() => handleImportCurated([item.slug])}
-                    className="flex items-center justify-center gap-1.5 rounded-lg bg-slate-800 py-2 text-xs font-medium text-slate-200 hover:bg-sky-500 hover:text-slate-950 transition"
-                  >
-                    <Download className="h-3.5 w-3.5" /> Add to Library
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPreviewTarget({
+                          name: item.name,
+                          payload: item.payload,
+                          segmentMode: "mirror",
+                        })
+                      }
+                      className="flex items-center justify-center gap-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-sky-300 transition"
+                      title="Simulate before importing"
+                    >
+                      <Eye className="h-3.5 w-3.5" /> Sim
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() => handleImportCurated([item.slug])}
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-slate-800 py-2 text-xs font-medium text-slate-200 hover:bg-sky-500 hover:text-slate-950 transition"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Add to Library
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -283,7 +377,22 @@ export function ImportPage({ onImported }: Props) {
                         />
                         {p.name}
                       </span>
-                      <span className="text-xs text-slate-400">key: {p.key}</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPreviewTarget({
+                              name: p.name,
+                              payload: p.payload,
+                              segmentMode: "mirror",
+                            })
+                          }
+                          className="flex items-center gap-1 rounded-lg border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800 hover:text-sky-300"
+                        >
+                          <Eye className="h-3 w-3" /> Sim
+                        </button>
+                        <span className="text-xs text-slate-400">key: {p.key}</span>
+                      </div>
                     </label>
                   );
                 })}
@@ -354,6 +463,20 @@ export function ImportPage({ onImported }: Props) {
                   <div className="text-xs text-slate-400">Slot #{p.key}</div>
                 </div>
                 <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPreviewTarget({
+                        name: p.name,
+                        payload: p.payload,
+                        segmentMode: "custom",
+                      })
+                    }
+                    className="flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs text-slate-300 hover:bg-slate-700 hover:text-sky-300"
+                    title="Simulate before importing"
+                  >
+                    <Eye className="h-3.5 w-3.5" /> Sim
+                  </button>
                   <button
                     disabled={busy}
                     onClick={() => handleImportCtrlPreset(p)}
