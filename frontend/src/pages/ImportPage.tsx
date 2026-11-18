@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CalendarPlus, Check, Code, Cpu, Download, Eye, Globe, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { api, ControllerProfile, FeedRecord } from "../api";
 import { SegmentSimulator } from "../components/SegmentSimulator";
+import { matchesThemeFilter, ThemeFilterBar } from "../components/ThemeFilterBar";
 
 interface Props {
   profile: ControllerProfile | null;
@@ -279,24 +280,7 @@ export function ImportPage({ profile, onImported }: Props) {
         })()}
 
       {tab === "curated" && (() => {
-        const filteredCurated =
-          curatedFilter === "all"
-            ? curated
-            : curated.filter((c) => Array.isArray(c.tags) && c.tags.includes(curatedFilter));
-        const curatedCategories = [
-          { key: "all", label: "All" },
-          { key: "gaming", label: "Gaming" },
-          { key: "bedroom", label: "Bedroom" },
-          { key: "romantic", label: "Romantic" },
-          { key: "christmas", label: "Christmas" },
-          { key: "diwali", label: "Diwali" },
-          { key: "halloween", label: "Halloween" },
-          { key: "party", label: "Party" },
-          { key: "fireplace", label: "Fireplace" },
-          { key: "rainbow", label: "Rainbow" },
-          { key: "ambient", label: "Ambient" },
-          { key: "nature", label: "Nature" },
-        ];
+        const filteredCurated = curated.filter((c) => matchesThemeFilter(c, curatedFilter));
         return (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -311,22 +295,7 @@ export function ImportPage({ profile, onImported }: Props) {
               {curatedFilter === "all" ? `Import All (${filteredCurated.length})` : `Import ${curatedFilter} (${filteredCurated.length})`}
             </button>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {curatedCategories.map((cat) => (
-              <button
-                key={cat.key}
-                type="button"
-                onClick={() => setCuratedFilter(cat.key)}
-                className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
-                  curatedFilter === cat.key
-                    ? "bg-sky-500 text-slate-950"
-                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
+          <ThemeFilterBar value={curatedFilter} onChange={setCuratedFilter} />
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredCurated.map((item) => {
               const grad =

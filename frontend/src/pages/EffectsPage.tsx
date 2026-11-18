@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Eye, Play, Plus, Search, Sliders, Trash2, UploadCloud } from "lucide-react";
 import { api, ControllerProfile, EffectRecord } from "../api";
 import { SegmentSimulator } from "../components/SegmentSimulator";
+import { matchesThemeFilter, ThemeFilterBar } from "../components/ThemeFilterBar";
 import { WledEffectEditorModal } from "../components/WledEffectEditorModal";
 import { paletteToCssGradient } from "../utils/wledFxEngine";
 
@@ -16,6 +17,7 @@ const PAGE_SIZE = 24;
 export function EffectsPage({ effects, profile, onRefresh }: Props) {
   const [query, setQuery] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [themeFilter, setThemeFilter] = useState<string>("all");
   const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
   const [editing, setEditing] = useState<{ effect: EffectRecord; isNew: boolean } | null>(null);
   const [previewEffect, setPreviewEffect] = useState<EffectRecord | null>(null);
@@ -36,11 +38,12 @@ export function EffectsPage({ effects, profile, onRefresh }: Props) {
 
   const filtered = effects.filter((e) => {
     const matchesSource = sourceFilter === "all" || e.source_type === sourceFilter;
+    const matchesTheme = matchesThemeFilter(e, themeFilter);
     const matchesQuery =
       !query.trim() ||
       e.name.toLowerCase().includes(query.toLowerCase()) ||
       e.tags.some((t) => t.toLowerCase().includes(query.toLowerCase()));
-    return matchesSource && matchesQuery;
+    return matchesSource && matchesTheme && matchesQuery;
   });
   const visibleEffects = filtered.slice(0, visibleCount);
 
@@ -181,6 +184,14 @@ export function EffectsPage({ effects, profile, onRefresh }: Props) {
           </button>
         </div>
       </div>
+
+      <ThemeFilterBar
+        value={themeFilter}
+        onChange={(theme) => {
+          setThemeFilter(theme);
+          setVisibleCount(PAGE_SIZE);
+        }}
+      />
 
       {(previewEffect || filtered[0]) && (
         <div className="sticky top-[61px] z-30 -mx-2 px-2 py-2 bg-slate-950/95 backdrop-blur shadow-lg shadow-slate-950/60">

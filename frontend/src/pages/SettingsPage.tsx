@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Cpu, RefreshCw, Save, ScrollText } from "lucide-react";
 import { api, ControllerProfile, EffectRecord, ExecutionLog, ScheduleRuleRecord } from "../api";
 import { SegmentSimulator } from "../components/SegmentSimulator";
+import { matchesThemeFilter, ThemeFilterBar } from "../components/ThemeFilterBar";
 
 interface Props {
   profile: ControllerProfile | null;
@@ -16,6 +17,7 @@ export function SettingsPage({ profile, liveState, effects, onRefreshController 
   const [lon, setLon] = useState(profile?.longitude ?? -112.03);
   const [tz, setTz] = useState(profile?.timezone || "America/Boise");
   const [defaultEffectId, setDefaultEffectId] = useState<number>(effects[0]?.id || 0);
+  const [defaultThemeFilter, setDefaultThemeFilter] = useState<string>("all");
   const [defaultTrigger, setDefaultTrigger] = useState<"sunset" | "sunrise" | "fixed_time">("sunset");
   const [defaultTime, setDefaultTime] = useState("18:00");
   const [currentDefault, setCurrentDefault] = useState<ScheduleRuleRecord | null>(null);
@@ -178,17 +180,30 @@ export function SettingsPage({ profile, liveState, effects, onRefreshController 
                 {currentDefault.trigger_time ? ` @ ${currentDefault.trigger_time}` : ""})
               </div>
             )}
+            <ThemeFilterBar
+              compact
+              value={defaultThemeFilter}
+              onChange={(theme) => {
+                setDefaultThemeFilter(theme);
+                const nextList = effects.filter((e) => matchesThemeFilter(e, theme));
+                if (nextList.length > 0 && !nextList.some((e) => e.id === defaultEffectId)) {
+                  setDefaultEffectId(nextList[0].id);
+                }
+              }}
+            />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <select
                 value={defaultEffectId}
                 onChange={(e) => setDefaultEffectId(Number(e.target.value))}
                 className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
               >
-                {effects.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.name}
-                  </option>
-                ))}
+                {effects
+                  .filter((e) => matchesThemeFilter(e, defaultThemeFilter))
+                  .map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.name}
+                    </option>
+                  ))}
               </select>
               <div className="flex gap-2">
                 <select

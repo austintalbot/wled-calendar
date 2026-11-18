@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Play, Plus, Sparkles, Sun, Sunrise, Sunset, Trash2, X } from "lucide-react";
 import { api, ControllerProfile, DayScheduleSummary, EffectRecord, ScheduleRuleRecord } from "../api";
 import { SegmentSimulator } from "../components/SegmentSimulator";
+import { matchesThemeFilter, ThemeFilterBar } from "../components/ThemeFilterBar";
 
 interface Props {
   effects: EffectRecord[];
@@ -31,6 +32,8 @@ export function CalendarPage({ effects, profile }: Props) {
   const [rules, setRules] = useState<ScheduleRuleRecord[]>([]);
   const [selectedDay, setSelectedDay] = useState<DayScheduleSummary | null>(null);
   const [selectedEffectId, setSelectedEffectId] = useState<number>(0);
+  const [dayThemeFilter, setDayThemeFilter] = useState<string>("all");
+  const [ruleThemeFilter, setRuleThemeFilter] = useState<string>("all");
   const [triggerType, setTriggerType] = useState<"sunset" | "sunrise" | "fixed_time">("sunset");
   const [triggerTime, setTriggerTime] = useState("18:00");
   const [offsetMinutes, setOffsetMinutes] = useState(0);
@@ -422,18 +425,35 @@ export function CalendarPage({ effects, profile }: Props) {
                   </div>
                   {effects.length === 0 ? (
                     <p className="text-xs text-amber-300">Import or create an effect first in the Import Hub.</p>
-                  ) : (
+                  ) : (() => {
+                    const filteredDayEffects = effects.filter((e) => matchesThemeFilter(e, dayThemeFilter));
+                    const activeDayEffectId = filteredDayEffects.some((e) => e.id === selectedEffectId)
+                      ? selectedEffectId
+                      : filteredDayEffects[0]?.id || 0;
+                    return (
                     <>
+                      <ThemeFilterBar
+                        compact
+                        value={dayThemeFilter}
+                        onChange={(theme) => {
+                          setDayThemeFilter(theme);
+                          const nextList = effects.filter((e) => matchesThemeFilter(e, theme));
+                          if (nextList.length > 0 && !nextList.some((e) => e.id === selectedEffectId)) {
+                            setSelectedEffectId(nextList[0].id);
+                          }
+                        }}
+                      />
                       <select
-                        value={selectedEffectId}
+                        value={activeDayEffectId}
                         onChange={(e) => setSelectedEffectId(Number(e.target.value))}
                         className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
                       >
-                        {effects.map((eff) => (
+                        {filteredDayEffects.map((eff) => (
                           <option key={eff.id} value={eff.id}>
                             {eff.name}
                           </option>
                         ))}
+                        {filteredDayEffects.length === 0 && <option value={0}>No effects match theme</option>}
                       </select>
 
                       <div className="grid grid-cols-2 gap-2">
@@ -474,14 +494,18 @@ export function CalendarPage({ effects, profile }: Props) {
                       </div>
 
                       <button
-                        disabled={busy || !selectedEffectId}
-                        onClick={handleAssignDate}
+                        disabled={busy || !activeDayEffectId}
+                        onClick={() => {
+                          if (activeDayEffectId !== selectedEffectId) setSelectedEffectId(activeDayEffectId);
+                          handleAssignDate();
+                        }}
                         className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-sm font-medium text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
                       >
                         <Plus className="h-4 w-4" /> Save Date Override
                       </button>
                     </>
-                  )}
+                    );
+                  })()}
                 </div>
               </div>
             ) : (
@@ -657,18 +681,31 @@ export function CalendarPage({ effects, profile }: Props) {
                 </div>
               )}
 
-              <div>
-                <label className="text-xs text-slate-400">Effect</label>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400 block">Effect</label>
+                <ThemeFilterBar
+                  compact
+                  value={ruleThemeFilter}
+                  onChange={(theme) => {
+                    setRuleThemeFilter(theme);
+                    const nextList = effects.filter((e) => matchesThemeFilter(e, theme));
+                    if (nextList.length > 0 && !nextList.some((e) => e.id === ruleEffectId)) {
+                      setRuleEffectId(nextList[0].id);
+                    }
+                  }}
+                />
                 <select
                   value={ruleEffectId}
                   onChange={(e) => setRuleEffectId(Number(e.target.value))}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
                 >
-                  {effects.map((eff) => (
-                    <option key={eff.id} value={eff.id}>
-                      {eff.name}
-                    </option>
-                  ))}
+                  {effects
+                    .filter((e) => matchesThemeFilter(e, ruleThemeFilter))
+                    .map((eff) => (
+                      <option key={eff.id} value={eff.id}>
+                        {eff.name}
+                      </option>
+                    ))}
                 </select>
               </div>
 
