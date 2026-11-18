@@ -101,8 +101,8 @@ export function SegmentSimulator({
 
     const maxLen = Math.max(...activeSegments.map((s) => s.len), 1);
     const buffers = activeSegments.map((spec) => new WledSegmentBuffer(spec.len));
-    // 3x3 sub-pixel cell per LED: 2px lit diode core + 1px dark housing gap
-    const cellW = 3;
+    // 4x3 sub-pixel cell per LED: 3px lit diode core + 1px dark housing gap
+    const cellW = 4;
     const cellH = 3;
     const offscreens = activeSegments.map((spec) => {
       const oc = document.createElement("canvas");
@@ -167,14 +167,14 @@ export function SegmentSimulator({
           }
         }
 
-        const padX = 4;
+        const padX = 6;
         const usableWidth = width - padX * 2;
         const barWidth = Math.max(1, (spec.len / maxLen) * usableWidth);
-        const ledHeight = compact ? 8 : 12;
+        const ledHeight = compact ? 16 : 22;
         const yTop = idx * rowHeight + (rowHeight - ledHeight) / 2;
 
-        ctx.fillStyle = "rgba(9, 13, 22, 0.95)";
-        ctx.fillRect(padX, yTop - 1, barWidth, ledHeight + 2);
+        ctx.fillStyle = "rgba(4, 7, 15, 0.98)";
+        ctx.fillRect(padX, yTop - 2, barWidth, ledHeight + 4);
 
         const { oc, octx, img } = offscreens[idx];
         if (octx && img) {
@@ -182,9 +182,9 @@ export function SegmentSimulator({
           const rowStride = oc.width * 4;
           const scale = globalBri * segBri;
           for (let d = 0; d < ledCount; d++) {
-            let r = 14;
-            let g = 18;
-            let b = 28;
+            let r = 16;
+            let g = 20;
+            let b = 32;
 
             if (liveBytes && liveLedCount > 0) {
               const globalLed = spec.start + d;
@@ -205,49 +205,45 @@ export function SegmentSimulator({
             }
 
             // Soften unlit/dim pixels to dark diode housing
-            const coreR = Math.max(14, r);
-            const coreG = Math.max(18, g);
-            const coreB = Math.max(28, b);
-            const edgeR = Math.max(10, (coreR * 0.55) | 0);
-            const edgeG = Math.max(13, (coreG * 0.55) | 0);
-            const edgeB = Math.max(20, (coreB * 0.55) | 0);
+            const coreR = Math.max(16, r);
+            const coreG = Math.max(20, g);
+            const coreB = Math.max(32, b);
+            const edgeR = Math.max(10, (coreR * 0.6) | 0);
+            const edgeG = Math.max(13, (coreG * 0.6) | 0);
+            const edgeB = Math.max(22, (coreB * 0.6) | 0);
             const baseX = d * cellW * 4;
 
-            // Row 0 & Row 2: top/bottom diode bezel + dark gap at col 2
+            // Row 0 & Row 2: top/bottom diode bezel + dark gap at col 3
             for (const row of [0, 2]) {
               const rowOff = row * rowStride + baseX;
-              data[rowOff] = edgeR;
-              data[rowOff + 1] = edgeG;
-              data[rowOff + 2] = edgeB;
-              data[rowOff + 3] = 255;
-
-              data[rowOff + 4] = edgeR;
-              data[rowOff + 5] = edgeG;
-              data[rowOff + 6] = edgeB;
-              data[rowOff + 7] = 255;
-
-              data[rowOff + 8] = 8;
-              data[rowOff + 9] = 11;
-              data[rowOff + 10] = 18;
-              data[rowOff + 11] = 255;
+              for (let c = 0; c < 3; c++) {
+                const p = rowOff + c * 4;
+                data[p] = edgeR;
+                data[p + 1] = edgeG;
+                data[p + 2] = edgeB;
+                data[p + 3] = 255;
+              }
+              const gap = rowOff + 12;
+              data[gap] = 6;
+              data[gap + 1] = 8;
+              data[gap + 2] = 14;
+              data[gap + 3] = 255;
             }
 
-            // Row 1: bright diode core at cols 0-1 + dark gap at col 2
+            // Row 1: bright diode core at cols 0-2 + dark gap at col 3
             const midOff = rowStride + baseX;
-            data[midOff] = coreR;
-            data[midOff + 1] = coreG;
-            data[midOff + 2] = coreB;
-            data[midOff + 3] = 255;
-
-            data[midOff + 4] = coreR;
-            data[midOff + 5] = coreG;
-            data[midOff + 6] = coreB;
-            data[midOff + 7] = 255;
-
-            data[midOff + 8] = 8;
-            data[midOff + 9] = 11;
-            data[midOff + 10] = 18;
-            data[midOff + 11] = 255;
+            for (let c = 0; c < 3; c++) {
+              const p = midOff + c * 4;
+              data[p] = coreR;
+              data[p + 1] = coreG;
+              data[p + 2] = coreB;
+              data[p + 3] = 255;
+            }
+            const midGap = midOff + 12;
+            data[midGap] = 6;
+            data[midGap + 1] = 8;
+            data[midGap + 2] = 14;
+            data[midGap + 3] = 255;
           }
           octx.putImageData(img, 0, 0);
           ctx.drawImage(oc, padX, yTop, barWidth, ledHeight);
@@ -298,9 +294,9 @@ export function SegmentSimulator({
 
       <canvas
         ref={canvasRef}
-        width={Math.max(1440, Math.max(...activeSegments.map((s) => s.len), 1) * 3 + 8)}
-        height={activeSegments.length * (compact ? 24 : 32)}
-        className="w-full rounded-lg bg-slate-950"
+        width={Math.max(1440, Math.max(...activeSegments.map((s) => s.len), 1) * 4 + 12)}
+        height={activeSegments.length * (compact ? 34 : 46)}
+        className="w-full rounded-lg bg-black/90"
       />
 
       <div className="flex flex-wrap gap-2 text-[10px] text-slate-400">
