@@ -134,7 +134,9 @@ export function SettingsPage({ profile, liveState, effects, onRefreshController 
                   segmentMode="custom"
                   effectNames={profile.effects}
                   paletteNames={profile.palettes}
+                  paletteColors={profile.palette_colors}
                   compact
+                  defaultLive
                   label="Live Controller Output (192.168.68.200)"
                 />
               )}

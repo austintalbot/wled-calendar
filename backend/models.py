@@ -6,7 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
-SegmentMode = Literal["mirror", "custom"]
+SegmentMode = Literal["mirror", "custom", "normalized"]
 SourceType = Literal["curated", "url", "json", "wled_preset", "manual"]
 RuleType = Literal["date", "date_range", "day_of_week", "holiday", "default"]
 TriggerType = Literal["fixed_time", "sunset", "sunrise"]
@@ -38,7 +38,9 @@ class ControllerProfile(BaseModel):
     timezone: str = "America/Boise"
     segments: list[SegmentSpec] = Field(default_factory=list)
     effects: list[str] = Field(default_factory=list)
+    fx_data: list[str] = Field(default_factory=list)
     palettes: list[str] = Field(default_factory=list)
+    palette_colors: dict[str, list[Any]] = Field(default_factory=dict)
     last_synced_at: str | None = None
 
 

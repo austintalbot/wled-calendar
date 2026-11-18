@@ -110,6 +110,17 @@ def _normalize_segment(
     return normalized
 
 
+def _scale_segment_for_length(seg: dict[str, Any], seg_len: int, ref_len: int) -> dict[str, Any]:
+    """Scale speed (sx) and intensity/density (ix) proportionally to segment length."""
+    if ref_len <= 0 or seg_len <= 0:
+        return seg
+    ratio = seg_len / ref_len
+    scaled = deepcopy(seg)
+    scaled["sx"] = max(1, min(255, round(int(seg.get("sx", 128)) * ratio)))
+    scaled["ix"] = max(1, min(255, round(int(seg.get("ix", 128)) * ratio)))
+    return scaled
+
+
 def adapt_payload_to_controller(
     raw_state: dict[str, Any],
     profile: ControllerProfile,
@@ -148,6 +159,8 @@ def adapt_payload_to_controller(
         valid_raw_segs = [{}]
 
     target_specs = profile.segments or [SegmentSpec(id=0, start=0, stop=profile.led_count, len=profile.led_count)]
+    sorted_lens = sorted(s.len for s in target_specs if s.len > 0)
+    ref_len = sorted_lens[len(sorted_lens) // 2] if sorted_lens else profile.led_count
     adapted_segs: list[dict[str, Any]] = []
 
     for idx, spec in enumerate(target_specs):
@@ -155,7 +168,10 @@ def adapt_payload_to_controller(
             source_seg = valid_raw_segs[idx]
         else:
             source_seg = valid_raw_segs[0]
-        adapted_segs.append(_normalize_segment(source_seg, spec, profile))
+        norm_seg = _normalize_segment(source_seg, spec, profile)
+        if segment_mode == "normalized":
+            norm_seg = _scale_segment_for_length(norm_seg, spec.len, ref_len)
+        adapted_segs.append(norm_seg)
 
     adapted["seg"] = adapted_segs
     return adapted
@@ -176,6 +192,32 @@ async def sync_controller_profile(host: str | None = None) -> ControllerProfile:
         )
         for resp in (info_resp, cfg_resp, eff_resp, pal_resp):
             resp.raise_for_status()
+
+        fx_data: list[str] = list(current.fx_data)
+        try:
+            fxdata_resp = await client.get(f"{base}/json/fxdata")
+            if fxdata_resp.status_code == 200 and isinstance(fxdata_resp.json(), list):
+                fx_data = fxdata_resp.json()
+        except Exception:
+            pass
+
+        palette_colors: dict[str, list[Any]] = dict(current.palette_colors)
+        try:
+            first_palx = await client.get(f"{base}/json/palx?page=0")
+            if first_palx.status_code == 200:
+                palx_data = first_palx.json()
+                palette_colors = dict(palx_data.get("p", {}))
+                max_page = int(palx_data.get("m", 0))
+                if max_page > 0:
+                    page_resps = await asyncio.gather(
+                        *(client.get(f"{base}/json/palx?page={p}") for p in range(1, max_page + 1)),
+                        return_exceptions=True,
+                    )
+                    for pr in page_resps:
+                        if isinstance(pr, httpx.Response) and pr.status_code == 200:
+                            palette_colors.update(pr.json().get("p", {}))
+        except Exception:
+            pass
 
     info = info_resp.json()
     cfg = cfg_resp.json()
@@ -217,7 +259,9 @@ async def sync_controller_profile(host: str | None = None) -> ControllerProfile:
         timezone=current.timezone,
         segments=segments or current.segments,
         effects=effects if isinstance(effects, list) else current.effects,
+        fx_data=fx_data,
         palettes=palettes if isinstance(palettes, list) else current.palettes,
+        palette_colors=palette_colors,
         last_synced_at=utc_now_iso(),
     )
     return save_controller_profile(updated)
@@ -274,5 +318,40 @@ async def apply_state(payload: dict[str, Any], host: str | None = None) -> dict[
     base = _base_url(host or profile.host)
     async with httpx.AsyncClient(timeout=settings.http_timeout) as client:
         resp = await client.post(f"{base}/json/state", json=payload)
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def save_preset_to_controller(
+    slot_id: int,
+    name: str,
+    payload: dict[str, Any],
+    host: str | None = None,
+) -> dict[str, Any]:
+    """Save or overwrite a preset slot (1-250) on the WLED controller."""
+    if not 1 <= slot_id <= 250:
+        raise ValueError("WLED preset slot_id must be between 1 and 250.")
+    profile = get_controller_profile()
+    base = _base_url(host or profile.host)
+    save_payload = deepcopy(payload)
+    save_payload["psave"] = slot_id
+    save_payload["n"] = name[:32]
+    async with httpx.AsyncClient(timeout=settings.http_timeout) as client:
+        resp = await client.post(f"{base}/json/state", json=save_payload)
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def delete_preset_from_controller(
+    slot_id: int,
+    host: str | None = None,
+) -> dict[str, Any]:
+    """Delete a preset slot (1-250) from the WLED controller."""
+    if not 1 <= slot_id <= 250:
+        raise ValueError("WLED preset slot_id must be between 1 and 250.")
+    profile = get_controller_profile()
+    base = _base_url(host or profile.host)
+    async with httpx.AsyncClient(timeout=settings.http_timeout) as client:
+        resp = await client.post(f"{base}/json/state", json={"pdel": slot_id})
         resp.raise_for_status()
         return resp.json()

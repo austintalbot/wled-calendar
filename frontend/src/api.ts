@@ -19,7 +19,9 @@ export interface ControllerProfile {
   timezone: string;
   segments: SegmentSpec[];
   effects: string[];
+  fx_data?: string[];
   palettes: string[];
+  palette_colors?: Record<string, any[]>;
   last_synced_at: string | null;
 }
 
@@ -37,7 +39,7 @@ export interface EffectRecord {
   source_type: string;
   source_url: string | null;
   payload: Record<string, any>;
-  segment_mode: "mirror" | "custom";
+  segment_mode: "mirror" | "custom" | "normalized";
   tags: string[];
   preview_colors: string[];
   created_at: string;
@@ -127,6 +129,15 @@ export const api = {
   getControllerStatus: () => request<ControllerStatus>("/api/controller/status"),
   syncController: () => request<{ profile: ControllerProfile }>("/api/controller/sync", { method: "POST" }),
   getControllerPresets: () => request<{ presets: any[] }>("/api/controller/presets"),
+  savePresetToController: (effectId: number, slotId: number, name?: string) =>
+    request<{ ok: boolean; slot_id: number; name: string }>("/api/controller/presets/save", {
+      method: "POST",
+      body: JSON.stringify({ effect_id: effectId, slot_id: slotId, name }),
+    }),
+  deleteControllerPreset: (slotId: number) =>
+    request<{ ok: boolean; deleted_slot: number }>(`/api/controller/presets/${slotId}`, {
+      method: "DELETE",
+    }),
   updateControllerSettings: (data: Partial<ControllerProfile>) =>
     request<{ profile: ControllerProfile }>("/api/controller/settings", {
       method: "PUT",

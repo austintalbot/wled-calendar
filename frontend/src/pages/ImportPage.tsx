@@ -343,18 +343,32 @@ export function ImportPage({ onImported }: Props) {
           </button>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
             {ctrlPresets.map((p) => (
-              <div key={p.key} className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 flex items-center justify-between">
+              <div key={p.key} className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 flex items-center justify-between gap-2">
                 <div>
                   <div className="font-medium text-slate-100">{p.name}</div>
                   <div className="text-xs text-slate-400">Slot #{p.key}</div>
                 </div>
-                <button
-                  disabled={busy}
-                  onClick={() => handleImportCtrlPreset(p)}
-                  className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs hover:bg-sky-500 hover:text-slate-950"
-                >
-                  Import
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    disabled={busy}
+                    onClick={() => handleImportCtrlPreset(p)}
+                    className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs hover:bg-sky-500 hover:text-slate-950"
+                  >
+                    Import
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={async () => {
+                      await api.deleteControllerPreset(Number(p.key));
+                      setCtrlPresets((prev) => prev.filter((x) => x.key !== p.key));
+                      setMessage(`Deleted preset slot #${p.key} from WLED controller.`);
+                    }}
+                    className="rounded-lg bg-slate-800 p-1.5 text-rose-400 hover:bg-slate-700"
+                    title="Delete from WLED controller"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>

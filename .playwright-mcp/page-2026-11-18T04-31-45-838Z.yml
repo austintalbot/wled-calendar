@@ -1,0 +1,525 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e8]:
+        - heading "WLED Calendar" [level=1] [ref=e9]
+        - paragraph [ref=e10]: Daily Effect Scheduler & Importer
+      - navigation [ref=e11]:
+        - button "Calendar" [ref=e12]
+        - button "Effects (190)" [ref=e69]
+        - button "Import Hub" [ref=e20]
+        - button "Controller & Logs" [active] [ref=e24]
+      - generic [ref=e28]:
+        - generic [ref=e36]: 192.168.68.200
+        - generic [ref=e74]: ·
+        - generic [ref=e75]: 1078 LEDs
+  - main [ref=e37]:
+    - generic [ref=e7248]:
+      - generic [ref=e7249]:
+        - generic [ref=e7250]:
+          - heading "WLED Controller Settings" [level=3] [ref=e7251]
+          - button "Sync Hardware" [ref=e7255]
+        - generic [ref=e7261]:
+          - generic [ref=e7262]:
+            - text: Controller IP / Host
+            - textbox [ref=e7263]: 192.168.68.200
+          - generic [ref=e7264]:
+            - text: Timezone
+            - textbox [ref=e7265]: America/Boise
+          - generic [ref=e7266]:
+            - text: Latitude (Sunset/Sunrise)
+            - spinbutton [ref=e7267]: "43.45"
+          - generic [ref=e7268]:
+            - text: Longitude (Sunset/Sunrise)
+            - spinbutton [ref=e7269]: "-112.03"
+        - button "Save Settings" [ref=e7270]
+        - generic [ref=e7275]:
+          - generic [ref=e7276]: Detected Segments (1078 Total LEDs · WLED 16.0.1)
+          - generic [ref=e7277]:
+            - generic [ref=e7278]:
+              - generic [ref=e7279]: Seg 1
+              - generic [ref=e7280]: 0 – 712 (712 LEDs)
+              - generic [ref=e7281]: GPIO 16
+            - generic [ref=e7282]:
+              - generic [ref=e7283]: Seg 2
+              - generic [ref=e7284]: 712 – 824 (112 LEDs)
+              - generic [ref=e7285]: GPIO 3
+            - generic [ref=e7286]:
+              - generic [ref=e7287]: Seg 3
+              - generic [ref=e7288]: 824 – 1078 (254 LEDs)
+              - generic [ref=e7289]: GPIO 1
+          - generic [ref=e7290]:
+            - generic [ref=e7291]:
+              - generic [ref=e7292]: Live Controller Output (192.168.68.200)
+              - generic [ref=e7293]:
+                - button "LIVE WLED" [ref=e7294]
+                - generic [ref=e7301]: custom
+            - generic [ref=e7303]:
+              - generic [ref=e7304]:
+                - generic [ref=e7305]: "Seg 1 (712):"
+                - generic [ref=e7306]: Noise 4
+                - generic [ref=e7307]: ·
+                - generic [ref=e7308]: "* Colors Only"
+              - generic [ref=e7309]:
+                - generic [ref=e7310]: "Seg 2 (112):"
+                - generic [ref=e7311]: Noise 4
+                - generic [ref=e7312]: ·
+                - generic [ref=e7313]: "* Colors Only"
+              - generic [ref=e7314]:
+                - generic [ref=e7315]: "Seg 3 (254):"
+                - generic [ref=e7316]: Noise 4
+                - generic [ref=e7317]: ·
+                - generic [ref=e7318]: "* Colors Only"
+      - generic [ref=e7319]:
+        - generic [ref=e7320]:
+          - heading "Daily Fallback Rule" [level=3] [ref=e7321]
+          - paragraph [ref=e7322]: Runs every day unless overridden by a specific date, holiday, or Google Calendar event.
+          - generic [ref=e7323]:
+            - combobox [ref=e7324]:
+              - option "Sparkle sunset" [selected]
+              - option "Lake-sunset"
+              - option "Halloween Running"
+              - option "Halloween tri"
+              - option "Sparkle-sunset"
+              - option "Spring Pastel"
+              - option "Traffic Light"
+              - option "Theater"
+              - option "Sunrise"
+              - option "Stream2"
+              - option "Stream"
+              - option "Sparkle"
+              - option "Sinelon"
+              - option "Scanner"
+              - option "Scan"
+              - option "Running"
+              - option "Ripple"
+              - option "Police"
+              - option "Phased"
+              - option "Pallet"
+              - option "Noise3"
+              - option "Meteor"
+              - option "Lake"
+              - option "Heartbeat"
+              - option "Flow"
+              - option "Fairytwinkles"
+              - option "Dynamic"
+              - option "Colorloop"
+              - option "Colorful"
+              - option "Chase Random"
+              - option "Chase"
+              - option "Candle"
+              - option "Breathe"
+              - option "BPM"
+              - option "Bouncing Balls"
+              - option "Blink Rainbow"
+              - option "Blink"
+              - option "Aurora"
+              - option "Android"
+              - option "Bouncy"
+              - option "Drift"
+              - option "DNA2"
+              - option "Sun"
+              - option "Polar"
+              - option "Fire2012"
+              - option "Swirl"
+              - option "DNA"
+              - option "Bursts"
+              - option "GOL"
+              - option "Game of Life"
+              - option "Black Hole"
+              - option "Tartan"
+              - option "Washing Machine"
+              - option "TwinkleFox"
+              - option "Twinkle"
+              - option "Tetrix"
+              - option "Scanner Dual"
+              - option "Popcorn"
+              - option "Oscillate"
+              - option "Noise 4"
+              - option "Noise 1"
+              - option "Lightning"
+              - option "Gradient"
+              - option "Glitter"
+              - option "Flow Stripe"
+              - option "Dissolve"
+              - option "Dissolve Rnd"
+              - option "Breath"
+              - option "Pulser"
+              - option "Polar Lights"
+              - option "Plasma Ball"
+              - option "Noise"
+              - option "Metaballs"
+              - option "Lissajous"
+              - option "Fire"
+              - option "Sweep"
+              - option "Sinelon Rainbow"
+              - option "Heating"
+              - option "Success"
+              - option "Pride 2015"
+              - option "Chase 3"
+              - option "Rainbow"
+              - option "Fireworks 1D"
+              - option "Colorwaves"
+              - option "Sinelon Rainbow"
+              - option "boot"
+              - option "Magred"
+              - option "Easter"
+              - option "leave"
+              - option "Red Green"
+              - option "arrive"
+              - option "Juggle"
+              - option "Pride"
+              - option "Candy Cane"
+              - option "Colortwinkles"
+              - option "Chase Rainbow"
+              - option "Blends"
+              - option "Scrolling Text"
+              - option "Octopus"
+              - option "Matrix"
+              - option "Sun Radiation"
+              - option "Hiphotic"
+              - option "Frizzles"
+              - option "Distortion Waves"
+              - option "Spotify"
+              - option "~ 05-02 22:04:09 ~"
+              - option "Percent"
+              - option "Gilded Pine"
+              - option "Royal Velvet"
+              - option "Spiced Cider"
+              - option "Midnight Forest"
+              - option "Cranberry Frost"
+              - option "Candlelight Eve"
+              - option "Winter Jewels"
+              - option "Champagne Glow"
+              - option "Evergreen & Gold"
+              - option "Mulled Wine"
+              - option "Christmas Ember"
+              - option "Blues"
+              - option "Juneteenth"
+              - option "AccentLighting2"
+              - option "AccentLights1"
+              - option "RGB"
+              - option "Fall Colors2"
+              - option "April Colors"
+              - option "FireworksBlue"
+              - option "FireworksGreen"
+              - option "FireworksRed"
+              - option "Lightning"
+              - option "Halloween"
+              - option "Valentines Day"
+              - option "Christmas4"
+              - option "Christmas3"
+              - option "Christmas2"
+              - option "Christmas"
+              - option "ChristmasZzs"
+              - option "St Patricks Day"
+              - option "Patriot2"
+              - option "Patriot"
+              - option "Red White Blue"
+              - 'option "Sports Team 2: change the colors to your team"'
+              - 'option "Sports Team: change the colors to your team"'
+              - option "Fireworks"
+              - option "Easter Stubs"
+              - option "Thanksgiving"
+              - option "Fall Colors"
+              - option "ColorWinkle"
+              - option "Desert Sky"
+              - option "Aurora Dreams"
+              - option "Depth Tranquility"
+              - option "Sparkling Vineyard"
+              - option "Moonlight Clarity"
+              - option "Mystical Twilight"
+              - option "Digital Rain"
+              - option "Zen Garden"
+              - option "Fiery Sky"
+              - option "Northern Lights 2"
+              - option "Fireflies"
+              - option "Spring Meadow"
+              - option "Galactic Train"
+              - option "Autumn Forest"
+              - option "Deep Sea"
+              - option "Crystal Heights"
+              - option "Witching Hour"
+              - option "Enchanted Garden"
+              - option "Sunset"
+              - option "Cosmic Nebula"
+              - option "Forest Magic"
+              - option "Northern Lights"
+              - option "Lava Stream"
+              - option "Starry Night"
+              - option "Valentinesday"
+              - option "Game Day Stadium Chase"
+              - option "Warm Architectural White"
+              - option "Spring Pastel"
+              - option "New Year's Champagne Sparkle"
+              - option "Rainbow Party"
+              - option "St. Patrick's Emerald"
+              - option "Valentine's Rose Pulse"
+              - option "Autumn Harvest"
+              - option "4th of July Fireworks"
+              - option "Halloween Spooky Flicker"
+              - option "Candy Cane Chase"
+              - option "Christmas Classic Twinkle"
+              - option "Ocean Breeze"
+              - option "Aurora Borealis"
+              - option "Warm Sunset Glow"
+              - option "Aurora Borealis"
+              - option "Christmas Classic Twinkle"
+              - option "Sparkle-sunset"
+            - combobox [ref=e7326]:
+              - option "At Sunset" [selected]
+              - option "Fixed Time"
+          - button "Set Daily Default" [ref=e7327]
+        - generic [ref=e7328]:
+          - heading "Recent Execution Logs" [level=3] [ref=e7329]
+          - generic [ref=e7333]:
+            - generic [ref=e7334]:
+              - generic [ref=e7335]:
+                - generic [ref=e7336]: Mystical Twilight
+                - generic [ref=e7337]: manual · 11/17/2026, 8:20:45 PM
+              - generic [ref=e7338]: success
+            - generic [ref=e7339]:
+              - generic [ref=e7340]:
+                - generic [ref=e7341]: Fireworks
+                - generic [ref=e7342]: manual · 11/17/2026, 8:20:30 PM
+              - generic [ref=e7343]: success
+            - generic [ref=e7344]:
+              - generic [ref=e7345]:
+                - generic [ref=e7346]: Lake-sunset
+                - generic [ref=e7347]: manual · 11/17/2026, 8:17:09 PM
+              - generic [ref=e7348]: success
+            - generic [ref=e7349]:
+              - generic [ref=e7350]:
+                - generic [ref=e7351]: Royal Velvet
+                - generic [ref=e7352]: manual · 11/17/2026, 8:15:24 PM
+              - generic [ref=e7353]: success
+            - generic [ref=e7354]:
+              - generic [ref=e7355]:
+                - generic [ref=e7356]: Gilded Pine
+                - generic [ref=e7357]: manual · 11/17/2026, 8:15:21 PM
+              - generic [ref=e7358]: success
+            - generic [ref=e7359]:
+              - generic [ref=e7360]:
+                - generic [ref=e7361]: Gilded Pine
+                - generic [ref=e7362]: manual · 11/17/2026, 8:15:18 PM
+              - generic [ref=e7363]: success
+            - generic [ref=e7364]:
+              - generic [ref=e7365]:
+                - generic [ref=e7366]: Gilded Pine
+                - generic [ref=e7367]: manual · 11/17/2026, 8:15:15 PM
+              - generic [ref=e7368]: success
+            - generic [ref=e7369]:
+              - generic [ref=e7370]:
+                - generic [ref=e7371]: Custom State
+                - generic [ref=e7372]: manual · 11/17/2026, 8:14:47 PM
+              - generic [ref=e7373]: success
+            - generic [ref=e7374]:
+              - generic [ref=e7375]:
+                - generic [ref=e7376]: Success
+                - generic [ref=e7377]: manual · 11/17/2026, 8:14:35 PM
+              - generic [ref=e7378]: success
+            - generic [ref=e7379]:
+              - generic [ref=e7380]:
+                - generic [ref=e7381]: Christmas Classic Twinkle
+                - generic [ref=e7382]: manual · 11/17/2026, 8:14:33 PM
+              - generic [ref=e7383]: success
+            - generic [ref=e7384]:
+              - generic [ref=e7385]:
+                - generic [ref=e7386]: Christmas Classic Twinkle
+                - generic [ref=e7387]: manual · 11/17/2026, 8:14:28 PM
+              - generic [ref=e7388]: success
+            - generic [ref=e7389]:
+              - generic [ref=e7390]:
+                - generic [ref=e7391]: Christmas Classic Twinkle
+                - generic [ref=e7392]: manual · 11/17/2026, 8:14:23 PM
+              - generic [ref=e7393]: success
+            - generic [ref=e7394]:
+              - generic [ref=e7395]:
+                - generic [ref=e7396]: Christmas Classic Twinkle
+                - generic [ref=e7397]: manual · 11/17/2026, 8:14:19 PM
+              - generic [ref=e7398]: success
+            - generic [ref=e7399]:
+              - generic [ref=e7400]:
+                - generic [ref=e7401]: Custom State
+                - generic [ref=e7402]: manual · 11/17/2026, 8:14:06 PM
+              - generic [ref=e7403]: success
+            - generic [ref=e7404]:
+              - generic [ref=e7405]:
+                - generic [ref=e7406]: Custom State
+                - generic [ref=e7407]: manual · 11/17/2026, 8:14:03 PM
+              - generic [ref=e7408]: success
+            - generic [ref=e7409]:
+              - generic [ref=e7410]:
+                - generic [ref=e7411]: Custom State
+                - generic [ref=e7412]: manual · 11/17/2026, 8:14:01 PM
+              - generic [ref=e7413]: success
+            - generic [ref=e7414]:
+              - generic [ref=e7415]:
+                - generic [ref=e7416]: Custom State
+                - generic [ref=e7417]: manual · 11/17/2026, 8:13:53 PM
+              - generic [ref=e7418]: success
+            - generic [ref=e7419]:
+              - generic [ref=e7420]:
+                - generic [ref=e7421]: Christmas Classic Twinkle
+                - generic [ref=e7422]: manual · 11/17/2026, 8:13:37 PM
+              - generic [ref=e7423]: success
+            - generic [ref=e7424]:
+              - generic [ref=e7425]:
+                - generic [ref=e7426]: Lissajous
+                - generic [ref=e7427]: manual · 11/17/2026, 8:13:34 PM
+              - generic [ref=e7428]: success
+            - generic [ref=e7429]:
+              - generic [ref=e7430]:
+                - generic [ref=e7431]: Christmas Classic Twinkle
+                - generic [ref=e7432]: manual · 11/17/2026, 8:13:30 PM
+              - generic [ref=e7433]: success
+            - generic [ref=e7434]:
+              - generic [ref=e7435]:
+                - generic [ref=e7436]: Lissajous
+                - generic [ref=e7437]: manual · 11/17/2026, 8:13:27 PM
+              - generic [ref=e7438]: success
+            - generic [ref=e7439]:
+              - generic [ref=e7440]:
+                - generic [ref=e7441]: Lissajous
+                - generic [ref=e7442]: manual · 11/17/2026, 8:13:24 PM
+              - generic [ref=e7443]: success
+            - generic [ref=e7444]:
+              - generic [ref=e7445]:
+                - generic [ref=e7446]: Custom State
+                - generic [ref=e7447]: manual · 11/17/2026, 8:13:14 PM
+              - generic [ref=e7448]: success
+            - generic [ref=e7449]:
+              - generic [ref=e7450]:
+                - generic [ref=e7451]: Custom State
+                - generic [ref=e7452]: manual · 11/17/2026, 8:13:14 PM
+              - generic [ref=e7453]: success
+            - generic [ref=e7454]:
+              - generic [ref=e7455]:
+                - generic [ref=e7456]: Custom State
+                - generic [ref=e7457]: manual · 11/17/2026, 8:13:14 PM
+              - generic [ref=e7458]: success
+            - generic [ref=e7459]:
+              - generic [ref=e7460]:
+                - generic [ref=e7461]: Custom State
+                - generic [ref=e7462]: manual · 11/17/2026, 8:13:13 PM
+              - generic [ref=e7463]: success
+            - generic [ref=e7464]:
+              - generic [ref=e7465]:
+                - generic [ref=e7466]: Custom State
+                - generic [ref=e7467]: manual · 11/17/2026, 8:13:02 PM
+              - generic [ref=e7468]: success
+            - generic [ref=e7469]:
+              - generic [ref=e7470]:
+                - generic [ref=e7471]: Custom State
+                - generic [ref=e7472]: manual · 11/17/2026, 8:12:41 PM
+              - generic [ref=e7473]: success
+            - generic [ref=e7474]:
+              - generic [ref=e7475]:
+                - generic [ref=e7476]: Lissajous
+                - generic [ref=e7477]: manual · 11/17/2026, 8:12:15 PM
+              - generic [ref=e7478]: success
+            - generic [ref=e7479]:
+              - generic [ref=e7480]:
+                - generic [ref=e7481]: Lake-sunset
+                - generic [ref=e7482]: manual · 11/17/2026, 8:11:15 PM
+              - generic [ref=e7483]: success
+            - generic [ref=e7484]:
+              - generic [ref=e7485]:
+                - generic [ref=e7486]: Polar Lights
+                - generic [ref=e7487]: manual · 11/17/2026, 8:11:08 PM
+              - generic [ref=e7488]: success
+            - generic [ref=e7489]:
+              - generic [ref=e7490]:
+                - generic [ref=e7491]: Polar Lights
+                - generic [ref=e7492]: manual · 11/17/2026, 8:11:08 PM
+              - generic [ref=e7493]: success
+            - generic [ref=e7494]:
+              - generic [ref=e7495]:
+                - generic [ref=e7496]: Polar Lights
+                - generic [ref=e7497]: manual · 11/17/2026, 8:11:08 PM
+              - generic [ref=e7498]: success
+            - generic [ref=e7499]:
+              - generic [ref=e7500]:
+                - generic [ref=e7501]: Polar Lights
+                - generic [ref=e7502]: manual · 11/17/2026, 8:11:06 PM
+              - generic [ref=e7503]: success
+            - generic [ref=e7504]:
+              - generic [ref=e7505]:
+                - generic [ref=e7506]: Metaballs
+                - generic [ref=e7507]: manual · 11/17/2026, 8:11:04 PM
+              - generic [ref=e7508]: success
+            - generic [ref=e7509]:
+              - generic [ref=e7510]:
+                - generic [ref=e7511]: Metaballs
+                - generic [ref=e7512]: manual · 11/17/2026, 8:11:03 PM
+              - generic [ref=e7513]: success
+            - generic [ref=e7514]:
+              - generic [ref=e7515]:
+                - generic [ref=e7516]: Metaballs
+                - generic [ref=e7517]: manual · 11/17/2026, 8:10:59 PM
+              - generic [ref=e7518]: success
+            - generic [ref=e7519]:
+              - generic [ref=e7520]:
+                - generic [ref=e7521]: Lissajous
+                - generic [ref=e7522]: manual · 11/17/2026, 8:10:58 PM
+              - generic [ref=e7523]: success
+            - generic [ref=e7524]:
+              - generic [ref=e7525]:
+                - generic [ref=e7526]: Plasma Ball
+                - generic [ref=e7527]: manual · 11/17/2026, 8:10:56 PM
+              - generic [ref=e7528]: success
+            - generic [ref=e7529]:
+              - generic [ref=e7530]:
+                - generic [ref=e7531]: Lissajous
+                - generic [ref=e7532]: manual · 11/17/2026, 8:10:55 PM
+              - generic [ref=e7533]: success
+            - generic [ref=e7534]:
+              - generic [ref=e7535]:
+                - generic [ref=e7536]: Lissajous
+                - generic [ref=e7537]: manual · 11/17/2026, 8:10:53 PM
+              - generic [ref=e7538]: success
+            - generic [ref=e7539]:
+              - generic [ref=e7540]:
+                - generic [ref=e7541]: Custom State
+                - generic [ref=e7542]: manual · 11/17/2026, 8:10:46 PM
+              - generic [ref=e7543]: success
+            - generic [ref=e7544]:
+              - generic [ref=e7545]:
+                - generic [ref=e7546]: Custom State
+                - generic [ref=e7547]: manual · 11/17/2026, 8:10:42 PM
+              - generic [ref=e7548]: success
+            - generic [ref=e7549]:
+              - generic [ref=e7550]:
+                - generic [ref=e7551]: Fireworks
+                - generic [ref=e7552]: schedule:date · 11/17/2026, 8:10:00 PM
+              - generic [ref=e7553]: success
+            - generic [ref=e7554]:
+              - generic [ref=e7555]:
+                - generic [ref=e7556]: Zen Garden
+                - generic [ref=e7557]: manual · 11/17/2026, 8:02:13 PM
+              - generic [ref=e7558]: success
+            - generic [ref=e7559]:
+              - generic [ref=e7560]:
+                - generic [ref=e7561]: Mystical Twilight
+                - generic [ref=e7562]: preset_save:#6 · 11/17/2026, 7:19:31 PM
+              - generic [ref=e7563]: success
+            - generic [ref=e7564]:
+              - generic [ref=e7565]:
+                - generic [ref=e7566]: Mystical Twilight
+                - generic [ref=e7567]: manual · 11/17/2026, 7:19:21 PM
+              - generic [ref=e7568]: success
+            - generic [ref=e7569]:
+              - generic [ref=e7570]:
+                - generic [ref=e7571]: Moonlight Clarity
+                - generic [ref=e7572]: manual · 11/17/2026, 7:19:16 PM
+              - generic [ref=e7573]: success
+            - generic [ref=e7574]:
+              - generic [ref=e7575]:
+                - generic [ref=e7576]: Spring Meadow
+                - generic [ref=e7577]: manual · 11/17/2026, 7:18:49 PM
+              - generic [ref=e7578]: success
+            - generic [ref=e7579]:
+              - generic [ref=e7580]:
+                - generic [ref=e7581]: Deep Sea
+                - generic [ref=e7582]: manual · 11/17/2026, 7:18:42 PM
+              - generic [ref=e7583]: success

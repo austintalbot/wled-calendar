@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { Eye, Layers, Play, Search, Sliders, Trash2 } from "lucide-react";
+import { Eye, Play, Plus, Search, Sliders, Trash2, UploadCloud } from "lucide-react";
 import { api, ControllerProfile, EffectRecord } from "../api";
 import { SegmentSimulator } from "../components/SegmentSimulator";
+import { WledEffectEditorModal } from "../components/WledEffectEditorModal";
+import { paletteToCssGradient } from "../utils/wledFxEngine";
 
 interface Props {
   effects: EffectRecord[];
@@ -11,8 +13,12 @@ interface Props {
 
 export function EffectsPage({ effects, profile, onRefresh }: Props) {
   const [query, setQuery] = useState("");
-  const [editing, setEditing] = useState<EffectRecord | null>(null);
+  const [editing, setEditing] = useState<{ effect: EffectRecord; isNew: boolean } | null>(null);
   const [previewEffect, setPreviewEffect] = useState<EffectRecord | null>(null);
+  const [savingEffect, setSavingEffect] = useState<EffectRecord | null>(null);
+  const [ctrlPresets, setCtrlPresets] = useState<any[]>([]);
+  const [saveSlot, setSaveSlot] = useState<number>(1);
+  const [saveName, setSaveName] = useState<string>("");
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
   const filtered = effects.filter(
@@ -32,30 +38,68 @@ export function EffectsPage({ effects, profile, onRefresh }: Props) {
 
   const handleDelete = async (id: number) => {
     await api.deleteEffect(id);
-    if (editing?.id === id) setEditing(null);
+    if (editing?.effect.id === id) setEditing(null);
     onRefresh();
   };
 
-  const handleSaveEdit = async () => {
-    if (!editing) return;
-    await api.updateEffect(editing.id, {
-      name: editing.name,
-      source_type: editing.source_type,
-      source_url: editing.source_url,
-      payload: editing.payload,
-      segment_mode: editing.segment_mode,
-      tags: editing.tags,
+  const openNewEffect = () => {
+    setEditing({
+      isNew: true,
+      effect: {
+        id: 0,
+        name: "New Custom Effect",
+        source_type: "manual",
+        source_url: null,
+        payload: {
+          on: true,
+          bri: 255,
+          transition: 7,
+          seg: [
+            {
+              fx: 0,
+              pal: 0,
+              sx: 128,
+              ix: 128,
+              c1: 128,
+              c2: 128,
+              c3: 16,
+              col: [[255, 160, 0], [0, 0, 0], [0, 0, 0]],
+            },
+          ],
+        },
+        segment_mode: "mirror",
+        tags: ["custom"],
+        preview_colors: ["#ffa000"],
+        created_at: "",
+      },
     });
-    setStatusMsg(`Saved "${editing.name}"`);
-    setEditing(null);
-    onRefresh();
   };
 
-  const updateSegField = (segIdx: number, field: string, value: number) => {
-    if (!editing) return;
-    const segs = [...(editing.payload.seg || [])];
-    segs[segIdx] = { ...segs[segIdx], [field]: value };
-    setEditing({ ...editing, payload: { ...editing.payload, seg: segs } });
+  const openSaveToWled = async (eff: EffectRecord) => {
+    setSavingEffect(eff);
+    setSaveName(eff.name.slice(0, 32));
+    try {
+      const res = await api.getControllerPresets();
+      setCtrlPresets(res.presets);
+      const used = new Set(res.presets.map((p) => Number(p.key)));
+      let nextFree = 1;
+      while (used.has(nextFree) && nextFree < 250) nextFree++;
+      setSaveSlot(nextFree);
+    } catch {
+      setCtrlPresets([]);
+      setSaveSlot(1);
+    }
+  };
+
+  const handleSaveToWled = async () => {
+    if (!savingEffect) return;
+    try {
+      const res = await api.savePresetToController(savingEffect.id, saveSlot, saveName);
+      setStatusMsg(`Saved "${res.name}" to WLED slot #${res.slot_id}!`);
+      setSavingEffect(null);
+    } catch (e: any) {
+      setStatusMsg(`Error: ${e.message}`);
+    }
   };
 
   return (
@@ -70,7 +114,15 @@ export function EffectsPage({ effects, profile, onRefresh }: Props) {
             className="w-full rounded-xl border border-slate-800 bg-slate-900 pl-9 pr-4 py-2 text-sm focus:border-sky-500 focus:outline-none"
           />
         </div>
-        {statusMsg && <span className="text-xs text-sky-300">{statusMsg}</span>}
+        <div className="flex items-center gap-3">
+          {statusMsg && <span className="text-xs text-sky-300">{statusMsg}</span>}
+          <button
+            onClick={openNewEffect}
+            className="flex items-center gap-1.5 rounded-xl bg-sky-500 px-3.5 py-2 text-xs font-semibold text-slate-950 hover:bg-sky-400"
+          >
+            <Plus className="h-4 w-4" /> New Effect
+          </button>
+        </div>
       </div>
 
       {(previewEffect || filtered[0]) && (
@@ -81,6 +133,7 @@ export function EffectsPage({ effects, profile, onRefresh }: Props) {
             segmentMode={(previewEffect || filtered[0]).segment_mode}
             effectNames={profile?.effects || []}
             paletteNames={profile?.palettes || []}
+            paletteColors={profile?.palette_colors}
             label={`Simulated Output: ${(previewEffect || filtered[0]).name}`}
           />
         </div>
@@ -88,13 +141,15 @@ export function EffectsPage({ effects, profile, onRefresh }: Props) {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filtered.map((eff) => {
-          const gradient =
-            eff.preview_colors.length >= 2
-              ? `linear-gradient(90deg, ${eff.preview_colors.join(", ")})`
-              : eff.preview_colors[0] || "#38bdf8";
           const seg0 = eff.payload?.seg?.[0] || {};
           const fxId = Number(seg0.fx ?? 0);
           const palId = Number(seg0.pal ?? 0);
+          const gradient = paletteToCssGradient(
+            palId,
+            seg0.col || [],
+            profile?.palette_colors,
+            eff.preview_colors
+          );
           const fxName = profile?.effects?.[fxId] || `FX #${fxId}`;
           const palName = profile?.palettes?.[palId] || `Palette #${palId}`;
 
@@ -125,34 +180,41 @@ export function EffectsPage({ effects, profile, onRefresh }: Props) {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
                 <button
                   onClick={() => handleTest(eff.id)}
-                  className="flex items-center gap-1.5 rounded-lg bg-sky-500/15 px-3 py-1.5 text-xs font-medium text-sky-300 hover:bg-sky-500/25"
+                  className="flex items-center gap-1 rounded-lg bg-sky-500/15 px-2.5 py-1.5 text-xs font-medium text-sky-300 hover:bg-sky-500/25"
                 >
-                  <Play className="h-3.5 w-3.5" /> Test on WLED
+                  <Play className="h-3.5 w-3.5" /> Apply
                 </button>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   <button
                     onClick={() => setPreviewEffect(eff)}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-sky-300"
+                    className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-slate-300 hover:bg-slate-800 hover:text-sky-300"
                     title="Simulate output"
                   >
-                    <Eye className="h-4 w-4" />
+                    <Eye className="h-3.5 w-3.5" /> Sim
                   </button>
                   <button
-                    onClick={() => setEditing(structuredClone(eff))}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
-                    title="Edit segments"
+                    onClick={() => setEditing({ effect: eff, isNew: false })}
+                    className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-slate-300 hover:bg-slate-800 hover:text-white"
+                    title="Edit in WLED editor"
                   >
-                    <Sliders className="h-4 w-4" />
+                    <Sliders className="h-3.5 w-3.5" /> Edit
+                  </button>
+                  <button
+                    onClick={() => openSaveToWled(eff)}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-emerald-300"
+                    title="Save / update preset on WLED controller"
+                  >
+                    <UploadCloud className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => handleDelete(eff.id)}
                     className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-rose-400"
                     title="Delete effect"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
@@ -167,142 +229,87 @@ export function EffectsPage({ effects, profile, onRefresh }: Props) {
         </div>
       )}
 
-      {/* Segment / Effect Editor Modal */}
+      {/* WLED-Style Effect Editor Modal */}
       {editing && (
+        <WledEffectEditorModal
+          effect={editing.effect}
+          isNew={editing.isNew}
+          profile={profile}
+          onClose={() => setEditing(null)}
+          onSaved={(saved) => {
+            setStatusMsg(`Saved "${saved.name}"`);
+            setEditing(null);
+            onRefresh();
+          }}
+        />
+      )}
+      {/* Save / Update Preset on WLED Controller Modal */}
+      {savingEffect && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Layers className="h-5 w-5 text-sky-400" /> Edit "{editing.name}"
+                <UploadCloud className="h-5 w-5 text-emerald-400" /> Save Preset to WLED
               </h3>
-              <button onClick={() => setEditing(null)} className="text-sm text-slate-400 hover:text-white">
+              <button onClick={() => setSavingEffect(null)} className="text-sm text-slate-400 hover:text-white">
                 Close
               </button>
             </div>
-
-            <SegmentSimulator
-              segments={profile?.segments || []}
-              payload={editing.payload}
-              segmentMode={editing.segment_mode}
-              effectNames={profile?.effects || []}
-              paletteNames={profile?.palettes || []}
-              compact
-              label="Live Editor Preview"
-            />
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <p className="text-xs text-slate-400">
+              Write <strong>{savingEffect.name}</strong> (all 3 segments) to a preset slot on your WLED controller.
+            </p>
+            <div className="space-y-3 text-sm">
               <div>
-                <label className="text-xs text-slate-400">Effect Name</label>
+                <label className="text-xs text-slate-400">Preset Name on WLED (max 32 chars)</label>
                 <input
-                  value={editing.name}
-                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+                  maxLength={32}
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
                 />
               </div>
               <div>
-                <label className="text-xs text-slate-400">Segment Mode</label>
-                <select
-                  value={editing.segment_mode}
-                  onChange={(e) => setEditing({ ...editing, segment_mode: e.target.value as "mirror" | "custom" })}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
-                >
-                  <option value="mirror">Mirror Segment 0 across all 3 strips</option>
-                  <option value="custom">Custom per-segment settings</option>
-                </select>
+                <label className="text-xs text-slate-400">Controller Preset Slot (1–250)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={250}
+                  value={saveSlot}
+                  onChange={(e) => setSaveSlot(Number(e.target.value))}
+                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
+                />
+                {ctrlPresets.find((p) => Number(p.key) === saveSlot) && (
+                  <p className="mt-1 text-xs text-amber-300">
+                    Will overwrite existing slot #{saveSlot}: "{ctrlPresets.find((p) => Number(p.key) === saveSlot).name}"
+                  </p>
+                )}
               </div>
+              {ctrlPresets.length > 0 && (
+                <div className="max-h-32 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/60 p-2 space-y-1">
+                  <div className="text-[10px] uppercase text-slate-500 px-1">Existing Controller Slots (click to overwrite)</div>
+                  {ctrlPresets.map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => setSaveSlot(Number(p.key))}
+                      className="w-full text-left rounded px-2 py-1 text-xs hover:bg-slate-800 flex justify-between"
+                    >
+                      <span className="text-slate-200">#{p.key} — {p.name}</span>
+                      <span className="text-slate-500">select</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-
-            <div className="space-y-3">
-              {(editing.payload.seg || []).slice(0, editing.segment_mode === "mirror" ? 1 : 3).map((seg: any, idx: number) => {
-                const spec = profile?.segments[idx];
-                return (
-                  <div key={idx} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 space-y-2">
-                    <div className="text-xs font-medium text-sky-300">
-                      {editing.segment_mode === "mirror"
-                        ? "All 3 Segments (Mirrored · 1078 LEDs)"
-                        : `Segment ${idx + 1} (${spec ? `${spec.start}–${spec.stop}, ${spec.len} LEDs` : ""})`}
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <label className="text-slate-400">Effect (FX)</label>
-                        {profile?.effects?.length ? (
-                          <select
-                            value={seg.fx ?? 0}
-                            onChange={(e) => updateSegField(idx, "fx", Number(e.target.value))}
-                            className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-2 py-1.5"
-                          >
-                            {profile.effects.map((name, id) => (
-                              <option key={id} value={id}>
-                                #{id} — {name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type="number"
-                            value={seg.fx ?? 0}
-                            onChange={(e) => updateSegField(idx, "fx", Number(e.target.value))}
-                            className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-2 py-1"
-                          />
-                        )}
-                      </div>
-                      <div>
-                        <label className="text-slate-400">Palette</label>
-                        {profile?.palettes?.length ? (
-                          <select
-                            value={seg.pal ?? 0}
-                            onChange={(e) => updateSegField(idx, "pal", Number(e.target.value))}
-                            className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-2 py-1.5"
-                          >
-                            {profile.palettes.map((name, id) => (
-                              <option key={id} value={id}>
-                                #{id} — {name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type="number"
-                            value={seg.pal ?? 0}
-                            onChange={(e) => updateSegField(idx, "pal", Number(e.target.value))}
-                            className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-2 py-1"
-                          />
-                        )}
-                      </div>
-                      <div>
-                        <label className="text-slate-400">Speed (sx: {seg.sx ?? 128})</label>
-                        <input
-                          type="number"
-                          min={0}
-                          max={255}
-                          value={seg.sx ?? 128}
-                          onChange={(e) => updateSegField(idx, "sx", Number(e.target.value))}
-                          className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-2 py-1"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-slate-400">Intensity (ix: {seg.ix ?? 128})</label>
-                        <input
-                          type="number"
-                          min={0}
-                          max={255}
-                          value={seg.ix ?? 128}
-                          onChange={(e) => updateSegField(idx, "ix", Number(e.target.value))}
-                          className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-2 py-1"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setEditing(null)} className="rounded-lg border border-slate-700 px-4 py-2 text-sm">
+              <button onClick={() => setSavingEffect(null)} className="rounded-lg border border-slate-700 px-4 py-2 text-sm">
                 Cancel
               </button>
-              <button onClick={handleSaveEdit} className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-sky-400">
-                Save Changes
+              <button
+                onClick={handleSaveToWled}
+                className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-emerald-400"
+              >
+                Save to Slot #{saveSlot}
               </button>
             </div>
           </div>

@@ -73,7 +73,9 @@ def init_db() -> None:
                 timezone TEXT NOT NULL,
                 segments_json TEXT NOT NULL,
                 effects_json TEXT NOT NULL,
+                fx_data_json TEXT NOT NULL DEFAULT '[]',
                 palettes_json TEXT NOT NULL,
+                palette_colors_json TEXT NOT NULL DEFAULT '{}',
                 last_synced_at TEXT
             );
 
@@ -144,6 +146,13 @@ def init_db() -> None:
             """
         )
 
+        # Migrate existing controller_profile table if palette_colors_json is missing
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(controller_profile)").fetchall()}
+        if "palette_colors_json" not in cols:
+            conn.execute("ALTER TABLE controller_profile ADD COLUMN palette_colors_json TEXT NOT NULL DEFAULT '{}'")
+        if "fx_data_json" not in cols:
+            conn.execute("ALTER TABLE controller_profile ADD COLUMN fx_data_json TEXT NOT NULL DEFAULT '[]'")
+
         row = conn.execute("SELECT id FROM controller_profile WHERE id = 1").fetchone()
         if not row:
             conn.execute(
@@ -192,7 +201,9 @@ def get_controller_profile() -> ControllerProfile:
             timezone=row["timezone"],
             segments=[SegmentSpec(**s) for s in json.loads(row["segments_json"])],
             effects=json.loads(row["effects_json"]),
+            fx_data=json.loads(row["fx_data_json"] or "[]"),
             palettes=json.loads(row["palettes_json"]),
+            palette_colors=json.loads(row["palette_colors_json"] or "{}"),
             last_synced_at=row["last_synced_at"],
         )
 
@@ -205,7 +216,7 @@ def save_controller_profile(profile: ControllerProfile) -> ControllerProfile:
             UPDATE controller_profile
             SET host = ?, name = ?, version = ?, led_count = ?, fx_count = ?, pal_count = ?,
                 latitude = ?, longitude = ?, timezone = ?, segments_json = ?,
-                effects_json = ?, palettes_json = ?, last_synced_at = ?
+                effects_json = ?, fx_data_json = ?, palettes_json = ?, palette_colors_json = ?, last_synced_at = ?
             WHERE id = 1
             """,
             (
@@ -220,7 +231,9 @@ def save_controller_profile(profile: ControllerProfile) -> ControllerProfile:
                 profile.timezone,
                 json.dumps([s.model_dump() for s in profile.segments]),
                 json.dumps(profile.effects),
+                json.dumps(profile.fx_data),
                 json.dumps(profile.palettes),
+                json.dumps(profile.palette_colors),
                 profile.last_synced_at,
             ),
         )

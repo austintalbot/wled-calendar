@@ -7,7 +7,12 @@ import pytest
 import respx
 
 from backend.models import ControllerProfile, SegmentSpec
-from backend.wled_client import adapt_payload_to_controller, sync_controller_profile
+from backend.wled_client import (
+    adapt_payload_to_controller,
+    delete_preset_from_controller,
+    save_preset_to_controller,
+    sync_controller_profile,
+)
 
 
 def _sample_profile() -> ControllerProfile:
@@ -132,3 +137,34 @@ async def test_sync_controller_profile_parses_wled_endpoints() -> None:
     assert synced.segments[0].stop == 712
     assert synced.segments[2].start == 824
     assert synced.latitude == 43.45
+
+
+@pytest.mark.asyncio
+async def test_save_and_delete_controller_preset() -> None:
+    profile_host = "192.168.68.200"
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.post(f"http://{profile_host}/json/state").mock(
+            return_value=httpx.Response(200, json={"success": True})
+        )
+        await save_preset_to_controller(7, "Holiday Glow", {"on": True, "bri": 255}, host=profile_host)
+        await delete_preset_from_controller(7, host=profile_host)
+
+    assert route.call_count == 2
+    first_body = route.calls[0].request.content.decode()
+    second_body = route.calls[1].request.content.decode()
+    assert '"psave":7' in first_body.replace(" ", "")
+    assert '"Holiday Glow"' in first_body
+    assert '"pdel":7' in second_body.replace(" ", "")
+
+
+def test_adapt_normalized_scales_speed_and_intensity_by_segment_length() -> None:
+    profile = _sample_profile()
+    preset = {"bri": 255, "seg": [{"fx": 2, "pal": 2, "sx": 100, "ix": 100}]}
+
+    adapted = adapt_payload_to_controller(preset, profile, segment_mode="normalized")
+    assert len(adapted["seg"]) == 3
+    # Segments are 712, 112, 254 -> median ref_len = 254
+    assert adapted["seg"][0]["sx"] == 255  # 100 * (712 / 254) = 280 -> clamped 255
+    assert adapted["seg"][1]["sx"] == 44   # 100 * (112 / 254) = 44
+    assert adapted["seg"][2]["sx"] == 100  # 100 * (254 / 254) = 100
+    assert adapted["seg"][1]["ix"] == 44

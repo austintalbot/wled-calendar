@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel, Field
+import websockets
 
 from backend.db import get_conn, get_controller_profile, log_execution, row_to_effect, save_controller_profile, utc_now_iso
 from backend.models import ControllerSettingsUpdate
 from backend.wled_client import (
     adapt_payload_to_controller,
     apply_state,
+    delete_preset_from_controller,
     fetch_controller_presets,
     fetch_live_state,
+    save_preset_to_controller,
     sync_controller_profile,
 )
 
@@ -26,6 +30,14 @@ class ApplyRequest(BaseModel):
     effect_id: int | None = None
     payload: dict[str, Any] | None = None
     brightness_override: int | None = None
+
+
+class SavePresetRequest(BaseModel):
+    """Save or overwrite a preset slot on the WLED controller."""
+
+    effect_id: int
+    slot_id: int = Field(..., ge=1, le=250)
+    name: str | None = None
 
 
 @router.get("/status")
@@ -92,6 +104,41 @@ async def update_controller_settings(body: ControllerSettingsUpdate) -> dict[str
     return {"profile": saved.model_dump()}
 
 
+@router.post("/presets/save")
+async def save_controller_preset(body: SavePresetRequest) -> dict[str, Any]:
+    """Save or overwrite a saved effect into a WLED controller preset slot (1-250)."""
+    profile = get_controller_profile()
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM effects WHERE id = ?", (body.effect_id,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Effect not found")
+
+    effect = row_to_effect(row)
+    preset_name = (body.name or effect["name"]).strip()[:32]
+    payload = adapt_payload_to_controller(effect["payload"], profile, segment_mode=effect["segment_mode"])
+
+    try:
+        res = await save_preset_to_controller(body.slot_id, preset_name, payload, host=profile.host)
+        log_execution(utc_now_iso(), body.effect_id, preset_name, f"preset_save:#{body.slot_id}", "success")
+        return {"ok": True, "slot_id": body.slot_id, "name": preset_name, "wled_response": res}
+    except Exception as exc:
+        log_execution(utc_now_iso(), body.effect_id, preset_name, f"preset_save:#{body.slot_id}", "error", str(exc))
+        raise HTTPException(status_code=502, detail=f"Failed to save preset to WLED: {exc}") from exc
+
+
+@router.delete("/presets/{slot_id}")
+async def remove_controller_preset(slot_id: int) -> dict[str, Any]:
+    """Delete a preset slot (1-250) from the WLED controller."""
+    profile = get_controller_profile()
+    try:
+        res = await delete_preset_from_controller(slot_id, host=profile.host)
+        return {"ok": True, "deleted_slot": slot_id, "wled_response": res}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to delete preset from WLED: {exc}") from exc
+
+
 @router.post("/apply")
 async def apply_now(body: ApplyRequest) -> dict[str, Any]:
     """Immediately push an effect or raw WLED state to the controller."""
@@ -128,3 +175,37 @@ async def apply_now(body: ApplyRequest) -> dict[str, Any]:
     except Exception as exc:
         log_execution(utc_now_iso(), effect_id, effect_name, "manual", "error", str(exc))
         raise HTTPException(status_code=502, detail=f"Failed to apply to WLED: {exc}") from exc
+
+
+@router.websocket("/live-stream")
+async def live_stream(websocket: WebSocket) -> None:
+    """Proxy WLED's WebSocket live-view RGB stream (`lv: true`) to the browser."""
+    await websocket.accept()
+    profile = get_controller_profile()
+    wled_ws_url = f"ws://{profile.host}/ws"
+
+    try:
+        async with websockets.connect(wled_ws_url, proxy=None, open_timeout=5) as wled_ws:
+            await wled_ws.send('{"lv":true}')
+
+            async def forward_from_wled() -> None:
+                async for msg in wled_ws:
+                    if isinstance(msg, (bytes, bytearray)) and len(msg) > 2 and msg[0] == 0x4C:
+                        await websocket.send_bytes(bytes(msg))
+
+            async def watch_client() -> None:
+                while True:
+                    await websocket.receive_text()
+
+            t1 = asyncio.create_task(forward_from_wled())
+            t2 = asyncio.create_task(watch_client())
+            _, pending = await asyncio.wait({t1, t2}, return_when=asyncio.FIRST_COMPLETED)
+            for task in pending:
+                task.cancel()
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass

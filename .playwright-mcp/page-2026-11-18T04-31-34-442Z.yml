@@ -1,0 +1,433 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e8]:
+        - heading "WLED Calendar" [level=1] [ref=e9]
+        - paragraph [ref=e10]: Daily Effect Scheduler & Importer
+      - navigation [ref=e11]:
+        - button "Calendar" [ref=e12]
+        - button "Effects (190)" [ref=e69]
+        - button "Import Hub" [ref=e20]
+        - button "Controller & Logs" [ref=e24]
+      - generic [ref=e28]:
+        - generic [ref=e36]: 192.168.68.200
+        - generic [ref=e74]: ·
+        - generic [ref=e75]: 1078 LEDs
+  - main [ref=e37]:
+    - generic [ref=e38]:
+      - generic [ref=e39]:
+        - heading "November 2026" [level=2] [ref=e43]
+        - generic [ref=e44]:
+          - button [ref=e45]
+          - button "Today" [ref=e48]
+          - button [ref=e49]
+      - generic [ref=e52]:
+        - generic [ref=e53]:
+          - generic [ref=e54]:
+            - generic [ref=e55]: Mon
+            - generic [ref=e56]: Tue
+            - generic [ref=e57]: Wed
+            - generic [ref=e58]: Thu
+            - generic [ref=e59]: Fri
+            - generic [ref=e60]: Sat
+            - generic [ref=e61]: Sun
+          - generic [ref=e76]:
+            - button "1 No effect 5:18 PM" [ref=e83]:
+              - generic [ref=e84]: "1"
+              - generic [ref=e87]:
+                - generic [ref=e88]: No effect
+                - generic [ref=e89]: 5:18 PM
+            - button "2 No effect 5:17 PM" [ref=e96]:
+              - generic [ref=e97]: "2"
+              - generic [ref=e100]:
+                - generic [ref=e101]: No effect
+                - generic [ref=e102]: 5:17 PM
+            - button "3 No effect 5:16 PM" [ref=e109]:
+              - generic [ref=e110]: "3"
+              - generic [ref=e113]:
+                - generic [ref=e114]: No effect
+                - generic [ref=e115]: 5:16 PM
+            - button "4 No effect 5:14 PM" [ref=e122]:
+              - generic [ref=e123]: "4"
+              - generic [ref=e126]:
+                - generic [ref=e127]: No effect
+                - generic [ref=e128]: 5:14 PM
+            - button "5 No effect 5:13 PM" [ref=e135]:
+              - generic [ref=e136]: "5"
+              - generic [ref=e139]:
+                - generic [ref=e140]: No effect
+                - generic [ref=e141]: 5:13 PM
+            - button "6 No effect 5:12 PM" [ref=e148]:
+              - generic [ref=e149]: "6"
+              - generic [ref=e152]:
+                - generic [ref=e153]: No effect
+                - generic [ref=e154]: 5:12 PM
+            - button "7 No effect 5:11 PM" [ref=e161]:
+              - generic [ref=e162]: "7"
+              - generic [ref=e165]:
+                - generic [ref=e166]: No effect
+                - generic [ref=e167]: 5:11 PM
+            - button "8 No effect 5:10 PM" [ref=e174]:
+              - generic [ref=e175]: "8"
+              - generic [ref=e178]:
+                - generic [ref=e179]: No effect
+                - generic [ref=e180]: 5:10 PM
+            - button "9 No effect 5:08 PM" [ref=e187]:
+              - generic [ref=e188]: "9"
+              - generic [ref=e191]:
+                - generic [ref=e192]: No effect
+                - generic [ref=e193]: 5:08 PM
+            - button "10 No effect 5:07 PM" [ref=e200]:
+              - generic [ref=e201]: "10"
+              - generic [ref=e204]:
+                - generic [ref=e205]: No effect
+                - generic [ref=e206]: 5:07 PM
+            - button "11 No effect 5:06 PM" [ref=e213]:
+              - generic [ref=e214]: "11"
+              - generic [ref=e217]:
+                - generic [ref=e218]: No effect
+                - generic [ref=e219]: 5:06 PM
+            - button "12 No effect 5:05 PM" [ref=e226]:
+              - generic [ref=e227]: "12"
+              - generic [ref=e230]:
+                - generic [ref=e231]: No effect
+                - generic [ref=e232]: 5:05 PM
+            - button "13 No effect 5:04 PM" [ref=e239]:
+              - generic [ref=e240]: "13"
+              - generic [ref=e243]:
+                - generic [ref=e244]: No effect
+                - generic [ref=e245]: 5:04 PM
+            - button "14 No effect 5:03 PM" [ref=e252]:
+              - generic [ref=e253]: "14"
+              - generic [ref=e256]:
+                - generic [ref=e257]: No effect
+                - generic [ref=e258]: 5:03 PM
+            - button "15 No effect 5:02 PM" [ref=e265]:
+              - generic [ref=e266]: "15"
+              - generic [ref=e269]:
+                - generic [ref=e270]: No effect
+                - generic [ref=e271]: 5:02 PM
+            - button "16 No effect 5:01 PM" [ref=e278]:
+              - generic [ref=e279]: "16"
+              - generic [ref=e282]:
+                - generic [ref=e283]: No effect
+                - generic [ref=e284]: 5:01 PM
+            - button "17 Mystical Twilight 8:19 PM" [active] [ref=e291]:
+              - generic [ref=e292]: "17"
+              - generic [ref=e294]:
+                - generic [ref=e296]: Mystical Twilight
+                - generic [ref=e297]: 8:19 PM
+            - button "18 No effect 5:00 PM" [ref=e302]:
+              - generic [ref=e303]: "18"
+              - generic [ref=e306]:
+                - generic [ref=e307]: No effect
+                - generic [ref=e308]: 5:00 PM
+            - button "19 No effect 4:59 PM" [ref=e315]:
+              - generic [ref=e316]: "19"
+              - generic [ref=e319]:
+                - generic [ref=e320]: No effect
+                - generic [ref=e321]: 4:59 PM
+            - button "20 No effect 4:58 PM" [ref=e328]:
+              - generic [ref=e329]: "20"
+              - generic [ref=e332]:
+                - generic [ref=e333]: No effect
+                - generic [ref=e334]: 4:58 PM
+            - button "21 No effect 4:57 PM" [ref=e341]:
+              - generic [ref=e342]: "21"
+              - generic [ref=e345]:
+                - generic [ref=e346]: No effect
+                - generic [ref=e347]: 4:57 PM
+            - button "22 No effect 4:57 PM" [ref=e354]:
+              - generic [ref=e355]: "22"
+              - generic [ref=e358]:
+                - generic [ref=e359]: No effect
+                - generic [ref=e360]: 4:57 PM
+            - button "23 No effect 4:56 PM" [ref=e367]:
+              - generic [ref=e368]: "23"
+              - generic [ref=e371]:
+                - generic [ref=e372]: No effect
+                - generic [ref=e373]: 4:56 PM
+            - button "24 No effect 4:55 PM" [ref=e380]:
+              - generic [ref=e381]: "24"
+              - generic [ref=e384]:
+                - generic [ref=e385]: No effect
+                - generic [ref=e386]: 4:55 PM
+            - button "25 No effect 4:55 PM" [ref=e393]:
+              - generic [ref=e394]: "25"
+              - generic [ref=e397]:
+                - generic [ref=e398]: No effect
+                - generic [ref=e399]: 4:55 PM
+            - button "26 No effect 4:54 PM" [ref=e406]:
+              - generic [ref=e407]: "26"
+              - generic [ref=e410]:
+                - generic [ref=e411]: No effect
+                - generic [ref=e412]: 4:54 PM
+            - button "27 No effect 4:54 PM" [ref=e419]:
+              - generic [ref=e420]: "27"
+              - generic [ref=e423]:
+                - generic [ref=e424]: No effect
+                - generic [ref=e425]: 4:54 PM
+            - button "28 No effect 4:53 PM" [ref=e432]:
+              - generic [ref=e433]: "28"
+              - generic [ref=e436]:
+                - generic [ref=e437]: No effect
+                - generic [ref=e438]: 4:53 PM
+            - button "29 No effect 4:53 PM" [ref=e445]:
+              - generic [ref=e446]: "29"
+              - generic [ref=e449]:
+                - generic [ref=e450]: No effect
+                - generic [ref=e451]: 4:53 PM
+            - button "30 No effect 4:53 PM" [ref=e458]:
+              - generic [ref=e459]: "30"
+              - generic [ref=e462]:
+                - generic [ref=e463]: No effect
+                - generic [ref=e464]: 4:53 PM
+        - generic [ref=e62]:
+          - generic [ref=e482]:
+            - generic [ref=e483]:
+              - generic [ref=e484]:
+                - heading "2026-11-17" [level=3] [ref=e485]
+                - paragraph [ref=e486]: "Sunset: 5:01 PM"
+              - button "Apply Now" [ref=e487]
+            - generic [ref=e490]:
+              - generic [ref=e491]:
+                - generic [ref=e492]: Active Baseline (date)
+                - generic [ref=e493]: Mystical Twilight
+                - generic [ref=e501]:
+                  - text: Turns on at 8:19 PM
+                  - generic [ref=e502]: (Fixed Time)
+              - generic [ref=e503]:
+                - generic [ref=e504]:
+                  - generic [ref=e505]: Day Preview
+                  - generic [ref=e506]:
+                    - button "Simulated (Click for Live)" [ref=e507]
+                    - generic [ref=e514]: mirror
+                - generic [ref=e516]:
+                  - generic [ref=e517]:
+                    - generic [ref=e518]: "Seg 1 (712):"
+                    - generic [ref=e519]: Noise 4
+                    - generic [ref=e520]: ·
+                    - generic [ref=e521]: "* Colors Only"
+                  - generic [ref=e522]:
+                    - generic [ref=e523]: "Seg 2 (112):"
+                    - generic [ref=e524]: Noise 4
+                    - generic [ref=e525]: ·
+                    - generic [ref=e526]: "* Colors Only"
+                  - generic [ref=e527]:
+                    - generic [ref=e528]: "Seg 3 (254):"
+                    - generic [ref=e529]: Noise 4
+                    - generic [ref=e530]: ·
+                    - generic [ref=e531]: "* Colors Only"
+            - generic [ref=e532]:
+              - generic [ref=e533]: Override This Date
+              - combobox [ref=e534]:
+                - option "Sparkle sunset" [selected]
+                - option "Lake-sunset"
+                - option "Halloween Running"
+                - option "Halloween tri"
+                - option "Sparkle-sunset"
+                - option "Spring Pastel"
+                - option "Traffic Light"
+                - option "Theater"
+                - option "Sunrise"
+                - option "Stream2"
+                - option "Stream"
+                - option "Sparkle"
+                - option "Sinelon"
+                - option "Scanner"
+                - option "Scan"
+                - option "Running"
+                - option "Ripple"
+                - option "Police"
+                - option "Phased"
+                - option "Pallet"
+                - option "Noise3"
+                - option "Meteor"
+                - option "Lake"
+                - option "Heartbeat"
+                - option "Flow"
+                - option "Fairytwinkles"
+                - option "Dynamic"
+                - option "Colorloop"
+                - option "Colorful"
+                - option "Chase Random"
+                - option "Chase"
+                - option "Candle"
+                - option "Breathe"
+                - option "BPM"
+                - option "Bouncing Balls"
+                - option "Blink Rainbow"
+                - option "Blink"
+                - option "Aurora"
+                - option "Android"
+                - option "Bouncy"
+                - option "Drift"
+                - option "DNA2"
+                - option "Sun"
+                - option "Polar"
+                - option "Fire2012"
+                - option "Swirl"
+                - option "DNA"
+                - option "Bursts"
+                - option "GOL"
+                - option "Game of Life"
+                - option "Black Hole"
+                - option "Tartan"
+                - option "Washing Machine"
+                - option "TwinkleFox"
+                - option "Twinkle"
+                - option "Tetrix"
+                - option "Scanner Dual"
+                - option "Popcorn"
+                - option "Oscillate"
+                - option "Noise 4"
+                - option "Noise 1"
+                - option "Lightning"
+                - option "Gradient"
+                - option "Glitter"
+                - option "Flow Stripe"
+                - option "Dissolve"
+                - option "Dissolve Rnd"
+                - option "Breath"
+                - option "Pulser"
+                - option "Polar Lights"
+                - option "Plasma Ball"
+                - option "Noise"
+                - option "Metaballs"
+                - option "Lissajous"
+                - option "Fire"
+                - option "Sweep"
+                - option "Sinelon Rainbow"
+                - option "Heating"
+                - option "Success"
+                - option "Pride 2015"
+                - option "Chase 3"
+                - option "Rainbow"
+                - option "Fireworks 1D"
+                - option "Colorwaves"
+                - option "Sinelon Rainbow"
+                - option "boot"
+                - option "Magred"
+                - option "Easter"
+                - option "leave"
+                - option "Red Green"
+                - option "arrive"
+                - option "Juggle"
+                - option "Pride"
+                - option "Candy Cane"
+                - option "Colortwinkles"
+                - option "Chase Rainbow"
+                - option "Blends"
+                - option "Scrolling Text"
+                - option "Octopus"
+                - option "Matrix"
+                - option "Sun Radiation"
+                - option "Hiphotic"
+                - option "Frizzles"
+                - option "Distortion Waves"
+                - option "Spotify"
+                - option "~ 05-02 22:04:09 ~"
+                - option "Percent"
+                - option "Gilded Pine"
+                - option "Royal Velvet"
+                - option "Spiced Cider"
+                - option "Midnight Forest"
+                - option "Cranberry Frost"
+                - option "Candlelight Eve"
+                - option "Winter Jewels"
+                - option "Champagne Glow"
+                - option "Evergreen & Gold"
+                - option "Mulled Wine"
+                - option "Christmas Ember"
+                - option "Blues"
+                - option "Juneteenth"
+                - option "AccentLighting2"
+                - option "AccentLights1"
+                - option "RGB"
+                - option "Fall Colors2"
+                - option "April Colors"
+                - option "FireworksBlue"
+                - option "FireworksGreen"
+                - option "FireworksRed"
+                - option "Lightning"
+                - option "Halloween"
+                - option "Valentines Day"
+                - option "Christmas4"
+                - option "Christmas3"
+                - option "Christmas2"
+                - option "Christmas"
+                - option "ChristmasZzs"
+                - option "St Patricks Day"
+                - option "Patriot2"
+                - option "Patriot"
+                - option "Red White Blue"
+                - 'option "Sports Team 2: change the colors to your team"'
+                - 'option "Sports Team: change the colors to your team"'
+                - option "Fireworks"
+                - option "Easter Stubs"
+                - option "Thanksgiving"
+                - option "Fall Colors"
+                - option "ColorWinkle"
+                - option "Desert Sky"
+                - option "Aurora Dreams"
+                - option "Depth Tranquility"
+                - option "Sparkling Vineyard"
+                - option "Moonlight Clarity"
+                - option "Mystical Twilight"
+                - option "Digital Rain"
+                - option "Zen Garden"
+                - option "Fiery Sky"
+                - option "Northern Lights 2"
+                - option "Fireflies"
+                - option "Spring Meadow"
+                - option "Galactic Train"
+                - option "Autumn Forest"
+                - option "Deep Sea"
+                - option "Crystal Heights"
+                - option "Witching Hour"
+                - option "Enchanted Garden"
+                - option "Sunset"
+                - option "Cosmic Nebula"
+                - option "Forest Magic"
+                - option "Northern Lights"
+                - option "Lava Stream"
+                - option "Starry Night"
+                - option "Valentinesday"
+                - option "Game Day Stadium Chase"
+                - option "Warm Architectural White"
+                - option "Spring Pastel"
+                - option "New Year's Champagne Sparkle"
+                - option "Rainbow Party"
+                - option "St. Patrick's Emerald"
+                - option "Valentine's Rose Pulse"
+                - option "Autumn Harvest"
+                - option "4th of July Fireworks"
+                - option "Halloween Spooky Flicker"
+                - option "Candy Cane Chase"
+                - option "Christmas Classic Twinkle"
+                - option "Ocean Breeze"
+                - option "Aurora Borealis"
+                - option "Warm Sunset Glow"
+                - option "Aurora Borealis"
+                - option "Christmas Classic Twinkle"
+                - option "Sparkle-sunset"
+              - generic [ref=e535]:
+                - generic [ref=e536]:
+                  - text: When
+                  - combobox [ref=e537]:
+                    - option "At Sunset" [selected]
+                    - option "At Sunrise"
+                    - option "Fixed Time"
+                - generic [ref=e538]:
+                  - text: Offset (min)
+                  - spinbutton "0" [ref=e539]
+              - button "Save Date Override" [ref=e540]
+          - generic [ref=e65]:
+            - heading "Active Schedule Rules (1)" [level=3] [ref=e471]
+            - generic [ref=e472]:
+              - generic [ref=e473]:
+                - generic [ref=e474]:
+                  - generic [ref=e475]: Mystical Twilight
+                  - generic [ref=e476]: Active
+                - generic [ref=e477]: 2026-11-17 · 8:19 PM
+              - button [ref=e478]

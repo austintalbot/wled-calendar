@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Play, Plus, Sparkles, Sun, Trash2, X } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Play, Plus, Sparkles, Sun, Sunrise, Sunset, Trash2, X } from "lucide-react";
 import { api, ControllerProfile, DayScheduleSummary, EffectRecord, ScheduleRuleRecord } from "../api";
 import { SegmentSimulator } from "../components/SegmentSimulator";
 
@@ -10,6 +10,18 @@ interface Props {
 }
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function formatRuleTrigger(r: ScheduleRuleRecord): string {
+  if (r.trigger_type === "fixed_time" && r.trigger_time) {
+    const [hh, mm] = r.trigger_time.split(":").map(Number);
+    const period = hh >= 12 ? "PM" : "AM";
+    const h12 = hh % 12 || 12;
+    return `${h12}:${String(mm).padStart(2, "0")} ${period}`;
+  }
+  const base = r.trigger_type === "sunrise" ? "Sunrise" : "Sunset";
+  if (!r.offset_minutes) return base;
+  return `${base} ${r.offset_minutes > 0 ? `+${r.offset_minutes}` : r.offset_minutes}m`;
+}
 
 export function CalendarPage({ effects, profile }: Props) {
   const now = new Date();
@@ -159,7 +171,7 @@ export function CalendarPage({ effects, profile }: Props) {
           </div>
           <div className="grid grid-cols-7 gap-2">
             {Array.from({ length: firstDayOffset }).map((_, idx) => (
-              <div key={`empty-${idx}`} className="min-h-24 rounded-xl bg-slate-900/30" />
+              <div key={`empty-${idx}`} className="min-h-[78px] rounded-xl bg-slate-900/30" />
             ))}
             {days.map((day) => {
               const dayNum = Number(day.date.split("-")[2]);
@@ -174,7 +186,7 @@ export function CalendarPage({ effects, profile }: Props) {
                 <button
                   key={day.date}
                   onClick={() => setSelectedDay(day)}
-                  className={`flex min-h-24 flex-col justify-between rounded-xl border p-2 text-left transition ${
+                  className={`flex min-h-[78px] flex-col justify-between rounded-xl border p-1.5 text-left transition ${
                     isSelected
                       ? "border-sky-400 bg-slate-800/90 ring-1 ring-sky-400"
                       : isToday
@@ -202,14 +214,36 @@ export function CalendarPage({ effects, profile }: Props) {
                     {day.effect_name ? (
                       <>
                         <div className="h-1.5 w-full rounded-full" style={{ background: gradient }} />
-                        <div className="truncate text-[11px] font-medium text-slate-200">{day.effect_name}</div>
-                        <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                          <Sun className="h-2.5 w-2.5 text-amber-400" />
+                        <div className="truncate text-[11px] font-medium text-slate-100">{day.effect_name}</div>
+                        <div
+                          className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold w-fit ${
+                            day.trigger_type === "fixed_time"
+                              ? "bg-sky-500/15 text-sky-300"
+                              : day.trigger_type === "sunrise"
+                                ? "bg-indigo-500/15 text-indigo-300"
+                                : "bg-amber-500/15 text-amber-300"
+                          }`}
+                        >
+                          {day.trigger_type === "fixed_time" ? (
+                            <Clock className="h-3 w-3 shrink-0" />
+                          ) : day.trigger_type === "sunrise" ? (
+                            <Sunrise className="h-3 w-3 shrink-0" />
+                          ) : (
+                            <Sunset className="h-3 w-3 shrink-0" />
+                          )}
                           <span>{day.trigger_time_resolved}</span>
                         </div>
                       </>
                     ) : (
-                      <div className="text-[10px] text-slate-500">No effect</div>
+                      <div className="space-y-0.5">
+                        <div className="text-[10px] text-slate-500">No effect</div>
+                        {day.sunset_time && (
+                          <div className="flex items-center gap-1 text-[10px] text-slate-600">
+                            <Sunset className="h-2.5 w-2.5" />
+                            <span>{day.sunset_time}</span>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </button>
@@ -241,13 +275,31 @@ export function CalendarPage({ effects, profile }: Props) {
 
                 {selectedDay.effect_name && (
                   <div className="space-y-3">
-                    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 space-y-2">
                       <div className="text-xs text-slate-400">Active Baseline ({selectedDay.source})</div>
-                      <div className="mt-1 flex items-center gap-2 font-medium text-slate-100">
+                      <div className="flex items-center gap-2 font-medium text-slate-100">
                         <Sparkles className="h-4 w-4 text-sky-400" />
                         {selectedDay.effect_name}
                       </div>
-                      <div className="mt-1 text-xs text-slate-400">Runs at {selectedDay.trigger_time_resolved}</div>
+                      <div className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-300">
+                        {selectedDay.trigger_type === "fixed_time" ? (
+                          <Clock className="h-3.5 w-3.5 text-sky-300" />
+                        ) : selectedDay.trigger_type === "sunrise" ? (
+                          <Sunrise className="h-3.5 w-3.5 text-indigo-300" />
+                        ) : (
+                          <Sunset className="h-3.5 w-3.5 text-amber-300" />
+                        )}
+                        <span>
+                          Turns on at {selectedDay.trigger_time_resolved}{" "}
+                          <span className="font-normal opacity-80">
+                            ({selectedDay.trigger_type === "fixed_time"
+                              ? "Fixed Time"
+                              : selectedDay.trigger_type === "sunrise"
+                                ? "Sunrise"
+                                : "Sunset"})
+                          </span>
+                        </span>
+                      </div>
                     </div>
                     {(() => {
                       const eff = effects.find((e) => e.id === selectedDay.effect_id);
@@ -259,6 +311,7 @@ export function CalendarPage({ effects, profile }: Props) {
                           segmentMode={eff.segment_mode}
                           effectNames={profile?.effects || []}
                           paletteNames={profile?.palettes || []}
+                          paletteColors={profile?.palette_colors}
                           compact
                           label="Day Preview"
                         />
@@ -303,30 +356,39 @@ export function CalendarPage({ effects, profile }: Props) {
                       </select>
 
                       <div className="grid grid-cols-2 gap-2">
-                        <select
-                          value={triggerType}
-                          onChange={(e) => setTriggerType(e.target.value as any)}
-                          className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs"
-                        >
-                          <option value="sunset">At Sunset</option>
-                          <option value="sunrise">At Sunrise</option>
-                          <option value="fixed_time">Fixed Time</option>
-                        </select>
+                        <div>
+                          <label className="text-[10px] text-slate-400">When</label>
+                          <select
+                            value={triggerType}
+                            onChange={(e) => setTriggerType(e.target.value as any)}
+                            className="mt-0.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs"
+                          >
+                            <option value="sunset">At Sunset</option>
+                            <option value="sunrise">At Sunrise</option>
+                            <option value="fixed_time">Fixed Time</option>
+                          </select>
+                        </div>
                         {triggerType === "fixed_time" ? (
-                          <input
-                            type="time"
-                            value={triggerTime}
-                            onChange={(e) => setTriggerTime(e.target.value)}
-                            className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs"
-                          />
+                          <div>
+                            <label className="text-[10px] text-slate-400">Time</label>
+                            <input
+                              type="time"
+                              value={triggerTime}
+                              onChange={(e) => setTriggerTime(e.target.value)}
+                              className="mt-0.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs"
+                            />
+                          </div>
                         ) : (
-                          <input
-                            type="number"
-                            value={offsetMinutes}
-                            onChange={(e) => setOffsetMinutes(Number(e.target.value))}
-                            placeholder="Offset min"
-                            className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs"
-                          />
+                          <div>
+                            <label className="text-[10px] text-slate-400">Offset (min)</label>
+                            <input
+                              type="number"
+                              value={offsetMinutes}
+                              onChange={(e) => setOffsetMinutes(Number(e.target.value))}
+                              placeholder="0"
+                              className="mt-0.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs"
+                            />
+                          </div>
                         )}
                       </div>
 
@@ -350,19 +412,42 @@ export function CalendarPage({ effects, profile }: Props) {
           <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 space-y-3">
             <h3 className="text-sm font-semibold text-slate-200">Active Schedule Rules ({rules.length})</h3>
             <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-              {rules.map((r) => (
-                <div key={r.id} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-xs">
-                  <div>
-                    <div className="font-medium text-slate-200">{r.effect_name}</div>
-                    <div className="text-slate-400">
-                      {r.rule_type} {r.start_date ? `(${r.start_date})` : ""} · {r.trigger_type}
+              {rules.map((r, idx) => {
+                const isShadowed =
+                  r.rule_type === "date" &&
+                  rules.slice(0, idx).some((higher) => higher.rule_type === "date" && higher.start_date === r.start_date);
+                return (
+                  <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-xs">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium text-slate-100 truncate">{r.effect_name}</span>
+                        {isShadowed ? (
+                          <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">
+                            Overridden
+                          </span>
+                        ) : (
+                          <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-300">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-0.5 text-slate-400">
+                        {r.rule_type === "date" && r.start_date
+                          ? r.start_date
+                          : r.rule_type === "date_range"
+                            ? `${r.start_date} → ${r.end_date}`
+                            : r.rule_type === "default"
+                              ? "Daily Default"
+                              : r.rule_type}{" "}
+                        · <span className="text-sky-300 font-medium">{formatRuleTrigger(r)}</span>
+                      </div>
                     </div>
+                    <button onClick={() => handleDeleteRule(r.id)} className="text-slate-500 hover:text-rose-400 shrink-0">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                  <button onClick={() => handleDeleteRule(r.id)} className="text-slate-500 hover:text-rose-400">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
               {rules.length === 0 && <p className="text-xs text-slate-500">No rules yet. Add a default rule in Settings or click a date.</p>}
             </div>
           </div>
