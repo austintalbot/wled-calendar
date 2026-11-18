@@ -36,6 +36,29 @@ export function beatsin8(bpm: number, low: number, high: number, timeSec: number
   return Math.round(low + (s / 255) * (high - low));
 }
 
+// Fast deterministic 1D/2D value noise (0..255) modeled on FastLED inoise8
+function hash2(x: number, y: number): number {
+  let n = (x * 374761393 + y * 668265263) | 0;
+  n = (n ^ (n >> 13)) * 1274126177;
+  return ((n ^ (n >> 16)) >>> 0) & 255;
+}
+
+export function inoise8(x: number, y = 0): number {
+  const xi = Math.floor(x / 16);
+  const yi = Math.floor(y / 16);
+  const xf = (x & 15) / 16;
+  const yf = (y & 15) / 16;
+  const u = xf * xf * (3 - 2 * xf);
+  const v = yf * yf * (3 - 2 * yf);
+  const a = hash2(xi, yi);
+  const b = hash2(xi + 1, yi);
+  const c = hash2(xi, yi + 1);
+  const d = hash2(xi + 1, yi + 1);
+  const x1 = a + (b - a) * u;
+  const x2 = c + (d - c) * u;
+  return Math.round(x1 + (x2 - x1) * v);
+}
+
 function toRgb(raw: unknown, fallback: Rgb): Rgb {
   if (Array.isArray(raw) && raw.length >= 3) {
     return [
@@ -177,18 +200,24 @@ export function colorFromPalette(
     }
     let left = palxStops[0];
     let right = palxStops[palxStops.length - 1];
+    let rightPos = right.pos;
+    let found = false;
     for (let i = 0; i < palxStops.length - 1; i++) {
       if (idx255 >= palxStops[i].pos && idx255 <= palxStops[i + 1].pos) {
         left = palxStops[i];
         right = palxStops[i + 1];
+        rightPos = right.pos;
+        found = true;
         break;
       }
     }
-    if (idx255 >= right.pos) {
+    if (!found && idx255 >= palxStops[palxStops.length - 1].pos) {
+      // Wrap around from last stop (e.g. 240) back to stop 0 (at 256), matching FastLED ColorFromPalette
       left = palxStops[palxStops.length - 1];
-      right = palxStops[palxStops.length - 1];
+      right = palxStops[0];
+      rightPos = 256;
     }
-    const span = Math.max(1, right.pos - left.pos);
+    const span = Math.max(1, rightPos - left.pos);
     const frac = Math.max(0, Math.min(1, (idx255 - left.pos) / span));
     return [
       Math.round((left.rgb[0] + (right.rgb[0] - left.rgb[0]) * frac) * scale),
@@ -299,6 +328,7 @@ export class WledSegmentBuffer {
     const cols = Array.isArray(seg.col) ? seg.col : [];
     const c1 = toRgb(cols[0], [255, 160, 0]);
     const c2 = toRgb(cols[1], [0, 0, 0]);
+    const c3 = toRgb(cols[2], [0, 0, 0]);
     const bpm = 12 + (sx / 255) * 90;
     const name = fxName.toLowerCase();
     const len = this.length;
@@ -311,7 +341,7 @@ export class WledSegmentBuffer {
       return;
     }
 
-    // 1: Blink / Strobe
+    // 1 / 26: Blink / Blink Rainbow / Strobe
     if (name.includes("blink") || name.includes("strobe")) {
       const on = beat8(bpm * 1.5, timeSec) < 128;
       const useRainbow = name.includes("rainbow");
@@ -320,9 +350,11 @@ export class WledSegmentBuffer {
       return;
     }
 
-    // 2: Breathe / Heartbeat
+    // 2 / 100: Breathe / Heartbeat
     if (name.includes("breathe") || name.includes("heartbeat")) {
-      const b = beatsin8(bpm * 0.6, 15, 255, timeSec);
+      const b = name.includes("heartbeat")
+        ? Math.max(15, sin8(beat8(bpm * 0.9, timeSec)) > 160 ? 255 : 40)
+        : beatsin8(bpm * 0.6, 15, 255, timeSec);
       for (let i = 0; i < len; i++) {
         const palIdx = palId === 0 ? 0 : Math.round((i / Math.max(1, len - 1)) * 255);
         this.setPixel(i, colorFromPalette(palName, palId, palIdx, cols, b, paletteColors));
@@ -330,21 +362,54 @@ export class WledSegmentBuffer {
       return;
     }
 
-    // 9: Rainbow
-    if (name === "rainbow" || name === "rainbow runner") {
-      const offset = beat8(bpm * 0.8, timeSec);
-      const delta = 1 + Math.round((ix / 255) * 6);
+    // 3 / 4 / 6 / 47: Wipe / Sweep / Loading
+    if (name.includes("wipe") || name.includes("sweep") || name === "loading") {
+      const pos = beat8(bpm * 0.6, timeSec);
+      const split = Math.round((pos / 255) * len);
+      const col = name.includes("random")
+        ? hsvToRgb(((timeSec * 0.5) | 0) * 97, 255, 255)
+        : colorFromPalette(palName, palId, pos, cols, 255, paletteColors);
       for (let i = 0; i < len; i++) {
-        this.setPixel(i, hsvToRgb(offset + i * delta, 255, 255));
+        if (name === "loading") {
+          const dist = Math.abs(i - split);
+          this.setPixel(i, dist < Math.max(2, len * 0.12) ? col : c2);
+        } else {
+          this.setPixel(i, i <= split ? col : c2);
+        }
       }
       return;
     }
 
-    // 10-11, 40-41: Scan / Scanner / Lighthouse / Sinelon
+    // 7 / 8: Dynamic / Colorloop
+    if (name === "colorloop" || name === "dynamic") {
+      const hue = beat8(bpm * 0.4, timeSec);
+      const col = name === "colorloop"
+        ? hsvToRgb(hue, 255, 255)
+        : colorFromPalette(palName, palId, hue, cols, 255, paletteColors);
+      this.fill(col);
+      return;
+    }
+
+    // 9 / 33 / 63: Rainbow / Rainbow Runner / Pride 2015
+    if (name === "rainbow" || name === "rainbow runner" || name.includes("pride")) {
+      const offset = beat8(bpm * 0.8, timeSec);
+      const delta = 1 + Math.round((ix / 255) * 6);
+      for (let i = 0; i < len; i++) {
+        const h = name.includes("pride")
+          ? (offset + i * 2 + sin8(i * 3 + offset)) & 255
+          : (offset + i * delta) & 255;
+        this.setPixel(i, hsvToRgb(h, 255, 255));
+      }
+      return;
+    }
+
+    // 10-11, 40-41, 60, 92-94: Scan / Scanner / Lighthouse / Sinelon
     if (name.includes("scan") || name.includes("lighthouse") || name.includes("sinelon")) {
       this.fadeToBlackBy(Math.max(12, 95 - Math.round((ix / 255) * 80)));
       const pos = Math.round((beatsin8(bpm, 0, 255, timeSec) / 255) * (len - 1));
-      const col = colorFromPalette(palName, palId, beat8(15, timeSec), cols, 255, paletteColors);
+      const col = name.includes("rainbow")
+        ? hsvToRgb(beat8(25, timeSec), 255, 255)
+        : colorFromPalette(palName, palId, beat8(15, timeSec), cols, 255, paletteColors);
       this.setPixel(pos, col);
       if (name.includes("dual")) {
         this.setPixel(len - 1 - pos, col);
@@ -352,17 +417,58 @@ export class WledSegmentBuffer {
       return;
     }
 
-    // 13-14: Theater / Theater Rainbow / Chase / Running
-    if (name.includes("theater") || name.includes("chase") || name.includes("running") || name.includes("candy")) {
+    // 12 / 56: Fade / Tri Fade
+    if (name === "fade" || name === "tri fade") {
+      const p = beat8(bpm * 0.5, timeSec);
+      const col = name === "tri fade"
+        ? colorFromPalette("default", 4, p, [c1, c2, c3], 255)
+        : colorFromPalette(palName, palId, p, cols, 255, paletteColors);
+      this.fill(col);
+      return;
+    }
+
+    // 46: Gradient
+    if (name === "gradient") {
+      const shift = Math.round((ix / 255) * 64);
+      for (let i = 0; i < len; i++) {
+        const palIdx = (Math.round((i / Math.max(1, len - 1)) * 255) + shift) & 255;
+        this.setPixel(i, colorFromPalette(palName, palId, palIdx, cols, 255, paletteColors));
+      }
+      return;
+    }
+
+    // 83 / 84 / 85 / 86: Solid Pattern / Solid Pattern Tri / Spots / Spots Fade
+    if (name.includes("solid pattern") || name.includes("spots")) {
+      const segSize = Math.max(2, Math.round(2 + (ix / 255) * 14));
+      const colors = name.includes("tri") ? [c1, c2, c3] : [c1, c2];
+      for (let i = 0; i < len; i++) {
+        const bucket = Math.floor(i / segSize) % colors.length;
+        this.setPixel(i, colors[bucket]);
+      }
+      return;
+    }
+
+    // 13-15, 27-30, 37, 52, 54: Theater / Chase / Running / Candy
+    if (
+      name.includes("theater") ||
+      name.includes("chase") ||
+      name.includes("running") ||
+      name.includes("candy") ||
+      name === "android"
+    ) {
       const shift = Math.floor(timeSec * (2 + (sx / 255) * 20));
       const spacing = name.includes("theater") ? 3 : Math.max(2, 8 - Math.round((ix / 255) * 5));
       for (let i = 0; i < len; i++) {
-        const active = (i + shift) % spacing === 0;
-        if (active) {
+        const pos = (i + shift) % spacing;
+        if (pos === 0) {
           const palIdx = name.includes("rainbow")
             ? (i * 5 + shift * 4) & 255
             : Math.round((i / Math.max(1, len - 1)) * 255);
-          this.setPixel(i, colorFromPalette(palName, palId, palIdx, cols, 255, paletteColors));
+          this.setPixel(i, name.includes("chase 2") || name.includes("chase 3")
+            ? c1
+            : colorFromPalette(palName, palId, palIdx, cols, 255, paletteColors));
+        } else if (name.includes("chase 3") && pos === 1) {
+          this.setPixel(i, c3);
         } else {
           this.setPixel(i, c2);
         }
@@ -370,31 +476,122 @@ export class WledSegmentBuffer {
       return;
     }
 
-    // 17-22, 80-81: Twinkle / Sparkle / Twinklefox / Fireworks
-    if (
-      name.includes("twinkle") ||
-      name.includes("sparkle") ||
-      name.includes("firework") ||
-      name.includes("popcorn")
-    ) {
-      const fadeRate = name.includes("twinklefox") ? 18 : 28 + Math.round((1 - ix / 255) * 35);
-      this.fadeToBlackBy(fadeRate);
-      if (name.includes("sparkle+") || name.includes("twinkle")) {
-        // Gentle background glow in secondary color
-        for (let i = 0; i < len; i++) {
-          if (this.pixels[i * 3] + this.pixels[i * 3 + 1] + this.pixels[i * 3 + 2] < 12) {
-            this.setPixel(i, [c2[0] >> 3, c2[1] >> 3, c2[2] >> 3]);
-          }
+    // 20 / 21 / 22: Sparkle / Sparkle Dark / Sparkle+
+    if (name.startsWith("sparkle")) {
+      const isPlus = name.includes("+");
+      const bg = isPlus ? c1 : c2;
+      const fg = isPlus ? c2 : c1;
+      this.fill(bg);
+      const count = 1 + Math.round((ix / 255) * Math.max(4, len * 0.04));
+      if (this.step % Math.max(1, Math.round(4 - (sx / 255) * 3)) === 0 || count > 0) {
+        for (let s = 0; s < count; s++) {
+          const idx = Math.floor(Math.random() * len);
+          this.setPixel(idx, fg);
         }
       }
-      const spawns = Math.max(1, Math.round((ix / 255) * (len * 0.08)));
+      return;
+    }
+
+    // 57: Lightning
+    if (name === "lightning") {
+      this.fadeToBlackBy(90);
+      if (Math.random() < 0.03 + (ix / 255) * 0.08) {
+        const start = Math.floor(Math.random() * len);
+        const span = Math.max(4, Math.floor((len * 0.25) * Math.random()));
+        for (let i = start; i < Math.min(len, start + span); i++) {
+          this.setPixel(i, [255, 255, 255]);
+        }
+      }
+      return;
+    }
+
+    // 74 / 80 / 81 / 17-19: Colortwinkles / Twinklefox / Twinkle
+    if (name.includes("twinkle")) {
+      if (name.includes("colortwinkle") || name.includes("twinklefox") || name.includes("fairy")) {
+        const speed = 0.5 + (sx / 255) * 2.5;
+        const density = 0.15 + (ix / 255) * 0.75;
+        for (let i = 0; i < len; i++) {
+          const seed = hash2(i, 42);
+          if ((seed / 255) > density) {
+            this.setPixel(i, [0, 0, 0]);
+            continue;
+          }
+          const phase = (timeSec * speed + (seed / 255) * 6.28) % 6.28;
+          const b = Math.max(0, Math.round(Math.sin(phase) * 255));
+          if (b <= 4) {
+            this.setPixel(i, [0, 0, 0]);
+          } else {
+            this.setPixel(i, colorFromPalette(palName, palId, seed, cols, b, paletteColors));
+          }
+        }
+        return;
+      }
+      this.fadeToBlackBy(28 + Math.round((1 - ix / 255) * 35));
+      const spawns = Math.max(1, Math.round((ix / 255) * (len * 0.05)));
       if (this.step % Math.max(1, Math.round(4 - (sx / 255) * 3)) === 0) {
         for (let s = 0; s < spawns; s++) {
           const idx = Math.floor(Math.random() * len);
-          const col = colorFromPalette(palName, palId, Math.floor(Math.random() * 256), cols, 255, paletteColors);
-          this.setPixel(idx, col);
+          this.setPixel(idx, colorFromPalette(palName, palId, Math.floor(Math.random() * 256), cols, 255, paletteColors));
         }
       }
+      return;
+    }
+
+    // 42 / 90 / 95: Fireworks / Fireworks 1D / Popcorn
+    if (name.includes("firework") || name.includes("popcorn")) {
+      this.fadeToBlackBy(30);
+      const bursts = Math.max(1, Math.round((ix / 255) * 4));
+      if (this.step % Math.max(1, Math.round(6 - (sx / 255) * 4)) === 0) {
+        for (let b = 0; b < bursts; b++) {
+          const center = Math.floor(Math.random() * len);
+          const col = colorFromPalette(palName, palId, Math.floor(Math.random() * 256), cols, 255, paletteColors);
+          const radius = Math.max(2, Math.round(len * 0.015));
+          for (let d = -radius; d <= radius; d++) {
+            const falloff = 1 - Math.abs(d) / (radius + 1);
+            this.addPixel(center + d, [
+              Math.round(col[0] * falloff),
+              Math.round(col[1] * falloff),
+              Math.round(col[2] * falloff),
+            ]);
+          }
+        }
+      }
+      return;
+    }
+
+    // 70-73: Noise 1 / Noise 2 / Noise 3 / Noise 4
+    if (name.startsWith("noise")) {
+      const scale = 6 + Math.round((ix / 255) * 28);
+      const t = Math.round(timeSec * (15 + (sx / 255) * 90));
+      for (let i = 0; i < len; i++) {
+        const n = inoise8(i * scale, t);
+        this.setPixel(i, colorFromPalette(palName, palId, n, cols, 255, paletteColors));
+      }
+      return;
+    }
+
+    // 88 / 102: Candle / Candle Multi
+    if (name.includes("candle")) {
+      const t = Math.round(timeSec * (20 + (sx / 255) * 60));
+      for (let i = 0; i < len; i++) {
+        const n = inoise8(name.includes("multi") ? i * 24 : 16, t);
+        const bri = Math.max(60, Math.min(255, 110 + Math.round((n / 255) * 145)));
+        this.setPixel(i, colorFromPalette(palName, palId, i & 255, cols, bri, paletteColors));
+      }
+      return;
+    }
+
+    // 79 / 99: Ripple / Ripple Rainbow
+    if (name.includes("ripple")) {
+      this.fadeToBlackBy(24);
+      const t = (timeSec * (0.5 + (sx / 255) * 2)) % 1;
+      const center = Math.floor(((hash2(Math.floor(timeSec * 0.8), 7) / 255)) * len);
+      const radius = Math.round(t * Math.max(8, len * 0.18));
+      const col = name.includes("rainbow")
+        ? hsvToRgb(beat8(30, timeSec), 255, 255)
+        : colorFromPalette(palName, palId, Math.round(t * 255), cols, 255, paletteColors);
+      this.setPixel(center + radius, col);
+      this.setPixel(center - radius, col);
       return;
     }
 
@@ -417,12 +614,14 @@ export class WledSegmentBuffer {
       return;
     }
 
-    // 67 / 75 / 38: Colorwaves / Lake / Aurora / Palette / Gradient / Default WLED Palette Wave
+    // 38 / 65 / 67 / 68 / 75 / 101 / 105 / 115: Aurora / Lake / Pacifica / Colorwaves / Palette / BPM / Phased / Blends
     const phase = beat8(bpm * 0.7, timeSec);
     const freq = 1 + Math.round((ix / 255) * 5);
+    const tNoise = Math.round(timeSec * (10 + (sx / 255) * 50));
     for (let i = 0; i < len; i++) {
       const wave = sin8(i * freq + phase);
-      const palIdx = (wave + ((i * 255) / len) * 0.5) & 255;
+      const n = inoise8(i * 10, tNoise);
+      const palIdx = ((wave + n) >> 1) & 255;
       this.setPixel(i, colorFromPalette(palName, palId, palIdx, cols, 255, paletteColors));
     }
   }
