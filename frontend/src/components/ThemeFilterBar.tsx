@@ -1,18 +1,15 @@
 export const THEME_FILTERS = [
   { key: "all", label: "All" },
-  { key: "gaming", label: "Gaming" },
-  { key: "bedroom", label: "Bedroom" },
-  { key: "romantic", label: "Romantic" },
+  { key: "holiday", label: "Holiday" },
   { key: "christmas", label: "Christmas" },
-  { key: "diwali", label: "Diwali" },
   { key: "halloween", label: "Halloween" },
+  { key: "gaming", label: "Gaming" },
   { key: "party", label: "Party" },
   { key: "fireplace", label: "Fireplace" },
   { key: "rainbow", label: "Rainbow" },
   { key: "ambient", label: "Ambient" },
   { key: "nature", label: "Nature" },
   { key: "everyday", label: "Everyday" },
-  { key: "holiday", label: "Holiday" },
 ] as const;
 
 export function matchesThemeFilter<T extends { name: string; tags?: string[] }>(item: T, theme: string): boolean {
